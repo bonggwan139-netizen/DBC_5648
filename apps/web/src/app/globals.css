@@ -1,0 +1,37 @@
+:root {
+  color-scheme: light;
+  font-family: "Pretendard", "Noto Sans KR", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f7f9fc;
+  color: #111827;
+}
+
+.site-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #d1d5db;
+  background: #ffffff;
+}
+
+.nav-list {
+  display: flex;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+}
+
+.nav-list a {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+.page-container {
+  padding: 1.5rem;
+}
