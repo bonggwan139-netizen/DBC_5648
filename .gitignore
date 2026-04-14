@@ -13,3 +13,6 @@ apps/web/.next/
 # OS/editor noise
 .DS_Store
 .vscode/
+
+# TypeScript build cache
+*.tsbuildinfo

@@ -1,4 +1,4 @@
-import styles from "./ServiceLayout.module.css";
+import styles from "./ServiceSidebar.module.css";
 
 const sidebarSections = [
   {
