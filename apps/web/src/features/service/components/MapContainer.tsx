@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Map as MapLibreMap } from "maplibre-gl";
 import { requestMockSearch } from "../api/searchMock";
+import { moveMapToResult } from "../lib/mapNavigation";
 import type { MockSearchItem, SearchStatus } from "../types/search";
 import styles from "./MapContainer.module.css";
 import { MapResultPanel } from "./MapResultPanel";
@@ -14,9 +16,11 @@ const INITIAL_ZOOM = 12;
 
 export function MapContainer() {
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<MapLibreMap | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<SearchStatus>("idle");
-  const [resultItem, setResultItem] = useState<MockSearchItem | null>(null);
+  const [results, setResults] = useState<MockSearchItem[]>([]);
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,8 +41,10 @@ export function MapContainer() {
       });
 
       map.addControl(new maplibregl.NavigationControl(), "top-right");
+      mapInstanceRef.current = map;
 
       cleanup = () => {
+        mapInstanceRef.current = null;
         map.remove();
       };
     };
@@ -49,6 +55,11 @@ export function MapContainer() {
       cleanup?.();
     };
   }, []);
+
+  const handleSelectResult = (item: MockSearchItem) => {
+    setSelectedResultId(item.id);
+    moveMapToResult(mapInstanceRef.current, item.longitude, item.latitude);
+  };
 
   const handleSearch = async () => {
     const trimmedQuery = query.trim();
@@ -62,10 +73,12 @@ export function MapContainer() {
 
     try {
       const response = await requestMockSearch(trimmedQuery);
-      setResultItem(response.items[0] ?? null);
+      setResults(response.items);
+      setSelectedResultId(null);
       setStatus("success");
     } catch {
-      setResultItem(null);
+      setResults([]);
+      setSelectedResultId(null);
       setStatus("error");
       setErrorMessage("검색 요청에 실패했습니다. 잠시 후 다시 시도해주세요.");
     }
@@ -92,7 +105,13 @@ export function MapContainer() {
         onQueryChange={setQuery}
         onSearch={handleSearch}
       />
-      <MapResultPanel status={status} resultItem={resultItem} errorMessage={errorMessage} />
+      <MapResultPanel
+        status={status}
+        results={results}
+        selectedResultId={selectedResultId}
+        onSelectResult={handleSelectResult}
+        errorMessage={errorMessage}
+      />
       <MapStatusBar />
     </section>
   );
