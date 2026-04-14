@@ -7,6 +7,8 @@ export type MockSearchItem = {
   roadAddress: string;
   summary: string;
   note: string;
+  longitude: number;
+  latitude: number;
 };
 
 export type MockSearchResponse = {
