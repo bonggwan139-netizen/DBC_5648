@@ -7,14 +7,14 @@ type MapResultPanelProps = {
   selectedResultId: string | null;
   onSelectResult: (item: MockSearchItem) => void;
   errorMessage: string | null;
+  docked?: boolean;
 };
 
 export function MapResultPanel({
   status,
-  results,
-  selectedResultId,
-  onSelectResult,
-  errorMessage
+  resultItem,
+  errorMessage,
+  docked = false
 }: MapResultPanelProps) {
   const selectedItem = results.find((item) => item.id === selectedResultId) ?? null;
 
@@ -41,7 +41,10 @@ export function MapResultPanel({
   ];
 
   return (
-    <section className={styles.resultPanel} aria-label="검색 결과 요약 패널">
+    <section
+      className={`${styles.resultPanel} ${docked ? styles.resultPanelDocked : ""}`}
+      aria-label="검색 결과 요약 패널"
+    >
       <h3 className={styles.resultTitle}>검색 결과 요약</h3>
       <p className={styles.resultStatus}>
         상태: {status === "idle" ? "대기" : status === "loading" ? "조회중" : status === "success" ? "성공" : "실패"}

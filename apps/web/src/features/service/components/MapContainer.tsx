@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Map as MapLibreMap } from "maplibre-gl";
+import { createPortal } from "react-dom";
 import { requestMockSearch } from "../api/searchMock";
 import { moveMapToResult } from "../lib/mapNavigation";
 import type { MockSearchItem, SearchStatus } from "../types/search";
@@ -14,7 +14,12 @@ import "maplibre-gl/dist/maplibre-gl.css";
 const INITIAL_CENTER: [number, number] = [126.978, 37.5665];
 const INITIAL_ZOOM = 12;
 
-export function MapContainer() {
+type MapContainerProps = {
+  isSearchPanelOpen: boolean;
+  resultPanelHost: HTMLDivElement | null;
+};
+
+export function MapContainer({ isSearchPanelOpen, resultPanelHost }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
   const [query, setQuery] = useState("");
@@ -84,6 +89,15 @@ export function MapContainer() {
     }
   };
 
+  const resultPanelNode = (
+    <MapResultPanel
+      status={status}
+      resultItem={resultItem}
+      errorMessage={errorMessage}
+      docked
+    />
+  );
+
   return (
     <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
       <div className={styles.topToolbar} aria-hidden="true">
@@ -91,28 +105,18 @@ export function MapContainer() {
         <button type="button">✛</button>
         <button type="button">⌖</button>
       </div>
-      <div className={styles.rightControls} aria-hidden="true">
-        <button type="button">+</button>
-        <button type="button">−</button>
-        <button type="button">☰</button>
-      </div>
-      <div className={styles.selectionArea} aria-hidden="true" />
 
       <div ref={mapRef} className={styles.mapCanvas} />
       <MapSearchOverlay
         query={query}
         status={status}
+        visible={isSearchPanelOpen}
         onQueryChange={setQuery}
         onSearch={handleSearch}
       />
-      <MapResultPanel
-        status={status}
-        results={results}
-        selectedResultId={selectedResultId}
-        onSelectResult={handleSelectResult}
-        errorMessage={errorMessage}
-      />
       <MapStatusBar />
+
+      {resultPanelHost ? createPortal(resultPanelNode, resultPanelHost) : resultPanelNode}
     </section>
   );
 }

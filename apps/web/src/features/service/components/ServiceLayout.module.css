@@ -4,13 +4,11 @@
   width: 100%;
   background: #f8fafc;
   overflow: hidden;
-  margin: -24px;
 }
 
 .serviceLeftPanel,
 .serviceRightPanel {
   position: relative;
-  overflow: hidden;
   transition: width 0.25s ease, min-width 0.25s ease, max-width 0.25s ease, padding 0.25s ease;
 }
 
@@ -18,18 +16,24 @@
   width: 320px;
   min-width: 320px;
   max-width: 320px;
+  height: calc(100vh - 56px);
   background: #f8fafc;
   border-right: 1px solid #e2e8f0;
   padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .serviceRightPanel {
   width: 360px;
   min-width: 360px;
   max-width: 360px;
+  height: calc(100vh - 56px);
   background: #ffffff;
   border-left: 1px solid #e2e8f0;
   padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .serviceMapStage {
@@ -41,8 +45,13 @@
 }
 
 .panelInner {
+  min-width: 0;
   height: 100%;
   transition: opacity 0.2s ease;
+}
+
+.resultPanelHost {
+  height: 100%;
 }
 
 .collapsed {
@@ -50,6 +59,7 @@
   min-width: 48px;
   max-width: 48px;
   padding: 8px 6px;
+  overflow: hidden;
 }
 
 .collapsed .panelInner {
@@ -65,11 +75,12 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 999px;
-  z-index: 30;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  pointer-events: auto;
   cursor: pointer;
 }
 
@@ -81,42 +92,8 @@
   left: -12px;
 }
 
-.resultPanelTitle {
-  margin: 0 0 16px;
-  font-size: 20px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.resultCardList {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.resultCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 16px;
-}
-
-.resultCard h4 {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.resultCard p {
-  margin: 0;
-  font-size: 12px;
-  color: #64748b;
-}
-
 @media (max-width: 1080px) {
   .serviceShell {
-    margin: -16px;
     flex-direction: column;
     height: auto;
   }
@@ -127,6 +104,7 @@
     width: 100%;
     min-width: 100%;
     max-width: 100%;
+    height: auto;
     padding: 12px;
   }
 

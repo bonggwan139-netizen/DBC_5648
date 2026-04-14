@@ -56,6 +56,23 @@
   line-height: 1.6;
 }
 
+
+.openSearchButton {
+  height: 40px;
+  width: 100%;
+  border: 0;
+  background: #2563eb;
+  color: #ffffff;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.openSearchButton:hover {
+  background: #1d4ed8;
+}
+
 .statusBox {
   margin-top: 10px;
   background: #f1f5f9;

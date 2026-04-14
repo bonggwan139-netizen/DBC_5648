@@ -1,6 +1,14 @@
 import styles from "./ServiceSidebar.module.css";
 
-export function ServiceSidebar() {
+type ServiceSidebarProps = {
+  isSearchPanelOpen: boolean;
+  onToggleSearchPanel: () => void;
+};
+
+export function ServiceSidebar({
+  isSearchPanelOpen,
+  onToggleSearchPanel
+}: ServiceSidebarProps) {
   return (
     <div className={styles.sidebarWrap}>
       <h2 className={styles.panelTitle}>작업 패널</h2>
@@ -10,7 +18,9 @@ export function ServiceSidebar() {
             <span className={styles.stepBadge}>1</span>
             <h3>위치 검색</h3>
           </div>
-          <p>지도 좌측 상단 검색 패널에서 주소 또는 지번을 입력하세요.</p>
+          <button type="button" className={styles.openSearchButton} onClick={onToggleSearchPanel}>
+            {isSearchPanelOpen ? "위치 검색 닫기" : "위치 검색"}
+          </button>
         </section>
 
         <section className={styles.stepCard}>

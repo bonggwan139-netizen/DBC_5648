@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import styles from "./ServiceLayout.module.css";
 import { MapContainer } from "./MapContainer";
 import { ServiceSidebar } from "./ServiceSidebar";
 
-const resultCards = ["분석 요약", "결과 요약", "추가 정보"];
-
 export function ServiceLayout() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
+  const resultPanelHostRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <section className={styles.serviceShell}>
@@ -23,12 +23,18 @@ export function ServiceLayout() {
           {leftCollapsed ? ">" : "<"}
         </button>
         <div className={styles.panelInner}>
-          <ServiceSidebar />
+          <ServiceSidebar
+            isSearchPanelOpen={isSearchPanelOpen}
+            onToggleSearchPanel={() => setIsSearchPanelOpen((prev) => !prev)}
+          />
         </div>
       </aside>
 
       <main className={styles.serviceMapStage}>
-        <MapContainer />
+        <MapContainer
+          isSearchPanelOpen={isSearchPanelOpen}
+          resultPanelHost={resultPanelHostRef.current}
+        />
       </main>
 
       <aside className={`${styles.serviceRightPanel} ${rightCollapsed ? styles.collapsed : ""}`}>
@@ -41,15 +47,7 @@ export function ServiceLayout() {
           {rightCollapsed ? "<" : ">"}
         </button>
         <div className={styles.panelInner}>
-          <h3 className={styles.resultPanelTitle}>결과 패널</h3>
-          <div className={styles.resultCardList}>
-            {resultCards.map((title) => (
-              <article key={title} className={styles.resultCard}>
-                <h4>{title}</h4>
-                <p>분석 실행 후 데이터가 표시됩니다.</p>
-              </article>
-            ))}
-          </div>
+          <div ref={resultPanelHostRef} className={styles.resultPanelHost} />
         </div>
       </aside>
     </section>
