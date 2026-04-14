@@ -1,5 +1,5 @@
 import styles from "./ServiceLayout.module.css";
-import { ServiceMapPlaceholder } from "./ServiceMapPlaceholder";
+import { MapContainer } from "./MapContainer";
 import { ServiceSidebar } from "./ServiceSidebar";
 import { ServiceTopHeader } from "./ServiceTopHeader";
 
@@ -9,7 +9,7 @@ export function ServiceLayout() {
       <ServiceTopHeader />
       <div className={styles.contentArea}>
         <ServiceSidebar />
-        <ServiceMapPlaceholder />
+        <MapContainer />
       </div>
     </section>
   );
