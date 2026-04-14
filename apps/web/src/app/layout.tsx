@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { MainNav } from "@/shared/components/MainNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Urban Planning Lab",
-  description: "도시계획 분석 실험용 웹 애플리케이션"
+  title: "DBC_UB",
+  description: "지도 기반 도시계획 분석 웹서비스"
 };
 
 export default function RootLayout({
@@ -16,8 +17,12 @@ export default function RootLayout({
     <html lang="ko">
       <body>
         <header className="site-header">
-          <h1>Urban Planning Lab</h1>
-          <MainNav />
+          <div className="header-inner">
+            <Link href="/" className="brand-logo" aria-label="DBC_UB 홈으로 이동">
+              DBC_UB
+            </Link>
+            <MainNav />
+          </div>
         </header>
         <main className="page-container">{children}</main>
       </body>
