@@ -15,11 +15,11 @@ const INITIAL_CENTER: [number, number] = [126.978, 37.5665];
 const INITIAL_ZOOM = 12;
 
 type MapContainerProps = {
-  isSearchPanelOpen: boolean;
-  resultPanelHost: HTMLDivElement | null;
+  isSearchPanelOpen?: boolean;
+  resultPanelHost?: HTMLDivElement | null;
 };
 
-export function MapContainer({ isSearchPanelOpen, resultPanelHost }: MapContainerProps) {
+export function MapContainer({ isSearchPanelOpen = true, resultPanelHost = null }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
   const [query, setQuery] = useState("");

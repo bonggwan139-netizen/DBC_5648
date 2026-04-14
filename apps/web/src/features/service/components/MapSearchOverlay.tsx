@@ -4,7 +4,7 @@ import styles from "./MapOverlay.module.css";
 type MapSearchOverlayProps = {
   query: string;
   status: SearchStatus;
-  visible: boolean;
+  visible?: boolean;
   onQueryChange: (value: string) => void;
   onSearch: () => void;
 };
@@ -12,7 +12,7 @@ type MapSearchOverlayProps = {
 export function MapSearchOverlay({
   query,
   status,
-  visible,
+  visible = true,
   onQueryChange,
   onSearch
 }: MapSearchOverlayProps) {
