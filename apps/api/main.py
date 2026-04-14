@@ -1,4 +1,4 @@
-"""FastAPI application entrypoint placeholder."""
+"""FastAPI application entrypoint."""
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
