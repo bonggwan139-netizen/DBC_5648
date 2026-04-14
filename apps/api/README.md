@@ -22,3 +22,4 @@ uvicorn main:app --reload
 헬스 체크:
 
 - `GET /api/v1/health` -> `{ "status": "ok" }`
+- `GET /api/v1/search?query=seoul` -> mock 검색 결과
