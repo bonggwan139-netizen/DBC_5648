@@ -1,29 +1,27 @@
 import styles from "./ServiceSidebar.module.css";
 
-const sidebarSections = [
-  {
-    title: "분석 대상",
-    description: "지번/주소 검색 UI가 들어올 자리"
-  },
-  {
-    title: "분석 옵션",
-    description: "필터, 기준 값 선택 UI가 들어올 자리"
-  },
-  {
-    title: "결과 요약",
-    description: "분석 결과 카드가 배치될 자리"
-  }
+const steps = [
+  { title: "STEP 1", subtitle: "위치 검색", desc: "주소/지번을 검색해 분석 위치를 설정하세요." },
+  { title: "STEP 2", subtitle: "영역 선택", desc: "지도에서 분석할 폴리곤 영역을 지정하세요." }
 ];
 
 export function ServiceSidebar() {
   return (
     <aside className={styles.sidebar} aria-label="분석 도구 패널">
-      {sidebarSections.map((section) => (
-        <section key={section.title} className={styles.sidebarCard}>
-          <h3>{section.title}</h3>
-          <p>{section.description}</p>
+      {steps.map((step) => (
+        <section key={step.title} className={styles.stepCard}>
+          <p>{step.title}</p>
+          <h3>{step.subtitle}</h3>
+          <span>{step.desc}</span>
         </section>
       ))}
+      <section className={styles.stepCard}>
+        <p>STEP 3</p>
+        <h3>분석 실행</h3>
+        <button type="button" className={styles.runBtn}>
+          분석 실행
+        </button>
+      </section>
     </aside>
   );
 }

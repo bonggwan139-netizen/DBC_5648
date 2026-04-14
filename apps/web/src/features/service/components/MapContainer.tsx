@@ -36,8 +36,6 @@ export function MapContainer() {
         zoom: INITIAL_ZOOM
       });
 
-      map.addControl(new maplibregl.NavigationControl(), "top-right");
-
       cleanup = () => {
         map.remove();
       };
@@ -73,7 +71,21 @@ export function MapContainer() {
 
   return (
     <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
+      <div className={styles.topToolbar}>
+        <button type="button" aria-label="선택 도구">▢</button>
+        <button type="button" aria-label="이동 도구">✥</button>
+        <button type="button" aria-label="측정 도구">∿</button>
+      </div>
+
       <div ref={mapRef} className={styles.mapCanvas} />
+      <div className={styles.selectionOverlay} aria-hidden="true" />
+
+      <div className={styles.mapControls}>
+        <button type="button" aria-label="확대">＋</button>
+        <button type="button" aria-label="축소">－</button>
+        <button type="button" aria-label="레이어">☰</button>
+      </div>
+
       <MapSearchOverlay
         query={query}
         status={status}
