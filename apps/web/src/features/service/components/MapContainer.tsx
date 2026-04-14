@@ -73,6 +73,18 @@ export function MapContainer() {
 
   return (
     <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
+      <div className={styles.topToolbar} aria-hidden="true">
+        <button type="button">◻</button>
+        <button type="button">✛</button>
+        <button type="button">⌖</button>
+      </div>
+      <div className={styles.rightControls} aria-hidden="true">
+        <button type="button">+</button>
+        <button type="button">−</button>
+        <button type="button">☰</button>
+      </div>
+      <div className={styles.selectionArea} aria-hidden="true" />
+
       <div ref={mapRef} className={styles.mapCanvas} />
       <MapSearchOverlay
         query={query}

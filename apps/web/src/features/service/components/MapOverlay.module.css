@@ -1,6 +1,6 @@
 .searchPanel {
   position: absolute;
-  top: 0.75rem;
+  top: 64px;
   left: 0.75rem;
   z-index: 20;
   width: min(440px, calc(100% - 1.5rem));
@@ -48,7 +48,7 @@
 
 .resultPanel {
   position: absolute;
-  top: 6.2rem;
+  top: 140px;
   left: 0.75rem;
   z-index: 20;
   width: min(440px, calc(100% - 1.5rem));
