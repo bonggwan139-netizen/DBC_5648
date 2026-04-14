@@ -1,0 +1,15 @@
+# Node.js dependencies
+node_modules/
+apps/web/node_modules/
+
+# Next.js build output
+.next/
+apps/web/.next/
+
+# Environment files
+.env
+.env.*
+
+# OS/editor noise
+.DS_Store
+.vscode/
