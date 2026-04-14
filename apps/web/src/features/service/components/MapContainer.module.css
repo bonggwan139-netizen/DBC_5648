@@ -3,22 +3,18 @@
   border-radius: 12px;
   background: #ffffff;
   padding: 1rem;
-  min-height: 480px;
+  height: 480px;
 }
 
 .mapCanvas {
   width: 100%;
-  min-height: 448px;
+  height: 100%;
   border-radius: 10px;
   overflow: hidden;
 }
 
 @media (max-width: 960px) {
   .mapArea {
-    min-height: 320px;
-  }
-
-  .mapCanvas {
-    min-height: 280px;
+    height: 320px;
   }
 }
