@@ -1,30 +1,136 @@
-.workspace {
+.serviceShell {
+  display: flex;
+  height: calc(100vh - 56px);
+  width: 100%;
+  background: #f8fafc;
+  overflow: hidden;
+  margin: -24px;
+}
+
+.serviceLeftPanel,
+.serviceRightPanel {
+  position: relative;
+  overflow: hidden;
+  transition: width 0.25s ease, min-width 0.25s ease, max-width 0.25s ease, padding 0.25s ease;
+}
+
+.serviceLeftPanel {
+  width: 320px;
+  min-width: 320px;
+  max-width: 320px;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  padding: 16px;
+}
+
+.serviceRightPanel {
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  padding: 16px;
+}
+
+.serviceMapStage {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.panelInner {
+  height: 100%;
+  transition: opacity 0.2s ease;
+}
+
+.collapsed {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  padding: 8px 6px;
+}
+
+.collapsed .panelInner {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggleButton {
+  position: absolute;
+  top: 16px;
+  width: 24px;
+  height: 48px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.leftToggle {
+  right: -12px;
+}
+
+.rightToggle {
+  left: -12px;
+}
+
+.resultPanelTitle {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.resultCardList {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  height: calc(100vh - 160px);
-  min-height: 620px;
+  gap: 16px;
 }
 
-.contentArea {
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 0.75rem;
-  flex: 1;
-  min-height: 0;
+.resultCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
 }
 
-.contentArea > * {
-  min-height: 0;
+.resultCard h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
 }
 
-@media (max-width: 960px) {
-  .workspace {
+.resultCard p {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+@media (max-width: 1080px) {
+  .serviceShell {
+    margin: -16px;
+    flex-direction: column;
     height: auto;
-    min-height: 0;
   }
 
-  .contentArea {
-    grid-template-columns: 1fr;
+  .serviceLeftPanel,
+  .serviceRightPanel,
+  .collapsed {
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    padding: 12px;
+  }
+
+  .toggleButton {
+    display: none;
   }
 }
