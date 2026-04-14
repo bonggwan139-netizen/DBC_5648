@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 const navItems = [
-  { href: "/", label: "홈" },
   { href: "/about", label: "소개" },
   { href: "/service", label: "서비스" }
 ];

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { requestMockSearch } from "../api/searchMock";
+import { moveMapToResult } from "../lib/mapNavigation";
 import type { MockSearchItem, SearchStatus } from "../types/search";
 import styles from "./MapContainer.module.css";
 import { MapResultPanel } from "./MapResultPanel";
@@ -20,9 +21,11 @@ type MapContainerProps = {
 
 export function MapContainer({ isSearchPanelOpen, resultPanelHost }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<MapLibreMap | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<SearchStatus>("idle");
-  const [resultItem, setResultItem] = useState<MockSearchItem | null>(null);
+  const [results, setResults] = useState<MockSearchItem[]>([]);
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,8 +46,10 @@ export function MapContainer({ isSearchPanelOpen, resultPanelHost }: MapContaine
       });
 
       map.addControl(new maplibregl.NavigationControl(), "top-right");
+      mapInstanceRef.current = map;
 
       cleanup = () => {
+        mapInstanceRef.current = null;
         map.remove();
       };
     };
@@ -55,6 +60,11 @@ export function MapContainer({ isSearchPanelOpen, resultPanelHost }: MapContaine
       cleanup?.();
     };
   }, []);
+
+  const handleSelectResult = (item: MockSearchItem) => {
+    setSelectedResultId(item.id);
+    moveMapToResult(mapInstanceRef.current, item.longitude, item.latitude);
+  };
 
   const handleSearch = async () => {
     const trimmedQuery = query.trim();
@@ -68,10 +78,12 @@ export function MapContainer({ isSearchPanelOpen, resultPanelHost }: MapContaine
 
     try {
       const response = await requestMockSearch(trimmedQuery);
-      setResultItem(response.items[0] ?? null);
+      setResults(response.items);
+      setSelectedResultId(null);
       setStatus("success");
     } catch {
-      setResultItem(null);
+      setResults([]);
+      setSelectedResultId(null);
       setStatus("error");
       setErrorMessage("검색 요청에 실패했습니다. 잠시 후 다시 시도해주세요.");
     }
