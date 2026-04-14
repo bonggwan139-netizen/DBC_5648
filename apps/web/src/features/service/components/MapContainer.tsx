@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import styles from "./MapContainer.module.css";
+import { MapSearchOverlay } from "./MapSearchOverlay";
+import { MapStatusBar } from "./MapStatusBar";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const INITIAL_CENTER: [number, number] = [126.978, 37.5665];
@@ -44,6 +46,8 @@ export function MapContainer() {
   return (
     <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
       <div ref={mapRef} className={styles.mapCanvas} />
+      <MapSearchOverlay />
+      <MapStatusBar />
     </section>
   );
 }
