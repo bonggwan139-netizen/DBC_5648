@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import styles from "./ServiceLayout.module.css";
 import { MapContainer } from "./MapContainer";
 import { ServiceSidebar } from "./ServiceSidebar";
@@ -9,7 +9,7 @@ export function ServiceLayout() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
-  const resultPanelHostRef = useRef<HTMLDivElement | null>(null);
+  const [resultPanelHost, setResultPanelHost] = useState<HTMLDivElement | null>(null);
 
   return (
     <section className={styles.serviceShell}>
@@ -33,7 +33,7 @@ export function ServiceLayout() {
       <main className={styles.serviceMapStage}>
         <MapContainer
           isSearchPanelOpen={isSearchPanelOpen}
-          resultPanelHost={resultPanelHostRef.current}
+          resultPanelHost={resultPanelHost}
         />
       </main>
 
@@ -47,7 +47,7 @@ export function ServiceLayout() {
           {rightCollapsed ? "<" : ">"}
         </button>
         <div className={styles.panelInner}>
-          <div ref={resultPanelHostRef} className={styles.resultPanelHost} />
+          <div ref={setResultPanelHost} className={styles.resultPanelHost} />
         </div>
       </aside>
     </section>
