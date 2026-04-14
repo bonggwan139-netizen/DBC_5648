@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { requestMockSearch } from "../api/searchMock";
 import type { MockSearchItem, SearchStatus } from "../types/search";
 import styles from "./MapContainer.module.css";
@@ -12,7 +13,12 @@ import "maplibre-gl/dist/maplibre-gl.css";
 const INITIAL_CENTER: [number, number] = [126.978, 37.5665];
 const INITIAL_ZOOM = 12;
 
-export function MapContainer() {
+type MapContainerProps = {
+  isSearchPanelOpen?: boolean;
+  resultPanelHost?: HTMLDivElement | null;
+};
+
+export function MapContainer({ isSearchPanelOpen = true, resultPanelHost = null }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<SearchStatus>("idle");
@@ -71,17 +77,34 @@ export function MapContainer() {
     }
   };
 
+  const resultPanelNode = (
+    <MapResultPanel
+      status={status}
+      resultItem={resultItem}
+      errorMessage={errorMessage}
+      docked
+    />
+  );
+
   return (
     <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
+      <div className={styles.topToolbar} aria-hidden="true">
+        <button type="button">◻</button>
+        <button type="button">✛</button>
+        <button type="button">⌖</button>
+      </div>
+
       <div ref={mapRef} className={styles.mapCanvas} />
       <MapSearchOverlay
         query={query}
         status={status}
+        visible={isSearchPanelOpen}
         onQueryChange={setQuery}
         onSearch={handleSearch}
       />
-      <MapResultPanel status={status} resultItem={resultItem} errorMessage={errorMessage} />
       <MapStatusBar />
+
+      {resultPanelHost ? createPortal(resultPanelNode, resultPanelHost) : resultPanelNode}
     </section>
   );
 }
