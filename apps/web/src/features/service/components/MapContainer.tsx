@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import styles from "./MapContainer.module.css";
+import { MapResultPanel } from "./MapResultPanel";
 import { MapSearchOverlay } from "./MapSearchOverlay";
 import { MapStatusBar } from "./MapStatusBar";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -47,6 +48,7 @@ export function MapContainer() {
     <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
       <div ref={mapRef} className={styles.mapCanvas} />
       <MapSearchOverlay />
+      <MapResultPanel />
       <MapStatusBar />
     </section>
   );
