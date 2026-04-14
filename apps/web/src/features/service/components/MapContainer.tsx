@@ -24,8 +24,7 @@ export function MapContainer() {
         container: mapRef.current as HTMLDivElement,
         style: "https://demotiles.maplibre.org/style.json",
         center: INITIAL_CENTER,
-        zoom: INITIAL_ZOOM,
-        attributionControl: true
+        zoom: INITIAL_ZOOM
       });
 
       map.addControl(new maplibregl.NavigationControl(), "top-right");
