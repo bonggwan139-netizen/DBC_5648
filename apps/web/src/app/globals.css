@@ -9,7 +9,7 @@
 
 body {
   margin: 0;
-  background: #f7f9fc;
+  background: #f8fafc;
   color: #111827;
 }
 
@@ -34,4 +34,9 @@ body {
 
 .page-container {
   padding: 1.5rem;
+}
+
+
+.service-page-shell {
+  margin: -1.5rem;
 }
