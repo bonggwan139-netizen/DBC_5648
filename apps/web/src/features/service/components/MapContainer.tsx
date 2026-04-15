@@ -23,7 +23,7 @@ export function MapContainer() {
     let cleanup: (() => void) | undefined;
 
     const setupMap = async () => {
-      const maplibregl = (await import("maplibre-gl")).default;
+      const maplibregl = await import("maplibre-gl");
 
       const map = new maplibregl.Map({
         container: mapRef.current as HTMLDivElement,
