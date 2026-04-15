@@ -1,4 +1,5 @@
-import styles from "./MapOverlay.module.css";
+import resultPanelStyles from "./MapResultPanel.module.css";
+import overlayStyles from "./MapOverlay.module.css";
 
 const resultSections = [
   {
@@ -21,16 +22,18 @@ const resultSections = [
 
 export function MapResultPanel() {
   return (
-    <section className={styles.resultPanel} aria-label="검색 결과 요약 패널">
-      <h3 className={styles.resultTitle}>검색 결과 요약 (Placeholder)</h3>
-      <div className={styles.resultSections}>
-        {resultSections.map((section) => (
-          <article key={section.title} className={styles.resultSectionCard}>
-            <h4>{section.title}</h4>
-            <p>{section.placeholder}</p>
-          </article>
-        ))}
+    <aside className={resultPanelStyles.resultPanel} aria-label="검색 결과 요약 패널">
+      <h3 className={overlayStyles.resultTitle}>검색 결과 요약</h3>
+      <div className={overlayStyles.resultSections}>
+        {resultSections.map((section) => {
+          return (
+            <article key={section.title} className={overlayStyles.resultSectionCard}>
+              <h4>{section.title}</h4>
+              <p>{section.placeholder}</p>
+            </article>
+          );
+        })}
       </div>
-    </section>
+    </aside>
   );
 }
