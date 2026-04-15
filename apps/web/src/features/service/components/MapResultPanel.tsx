@@ -37,3 +37,5 @@ export function MapResultPanel() {
     </aside>
   );
 }
+
+export default MapResultPanel;
