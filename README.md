@@ -22,5 +22,6 @@ npm install
 npm run dev
 ```
 
-Open: `http://localhost:3000`
+Open (local): `http://localhost:3000`
 
+Production: deploy on Vercel and use the generated `https://<project>.vercel.app` URL.
