@@ -15,7 +15,10 @@ const sidebarSections = [
   }
 ];
 
-export function ServiceSidebar() {
+export function ServiceSidebar({
+  isSearchPanelOpen,
+  onToggleSearchPanel
+}: ServiceSidebarProps) {
   return (
     <aside className={styles.sidebar} aria-label="분석 도구 패널">
       {sidebarSections.map((section) => (

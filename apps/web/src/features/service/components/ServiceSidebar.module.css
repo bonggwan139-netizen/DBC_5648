@@ -1,4 +1,15 @@
-.sidebar {
+.sidebarWrap {
+  height: 100%;
+}
+
+.panelTitle {
+  margin: 0 0 16px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.stepGroup {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;

@@ -9,6 +9,12 @@
   border-radius: 10px;
   padding: 0.75rem;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+  transition: opacity 0.2s ease;
+}
+
+.hiddenPanel {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .searchRow {
@@ -59,6 +65,17 @@
   border-radius: 10px;
   padding: 0.75rem;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.resultPanelDocked {
+  position: static;
+  left: auto;
+  top: auto;
+  width: 100%;
+  max-height: none;
+  border: 1px solid #e2e8f0;
+  box-shadow: none;
+  background: #ffffff;
 }
 
 .resultTitle {

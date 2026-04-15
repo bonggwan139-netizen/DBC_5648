@@ -4,6 +4,7 @@ import styles from "./MapOverlay.module.css";
 type MapSearchOverlayProps = {
   query: string;
   status: SearchStatus;
+  visible?: boolean;
   onQueryChange: (value: string) => void;
   onSearch: () => void;
 };
@@ -11,13 +12,18 @@ type MapSearchOverlayProps = {
 export function MapSearchOverlay({
   query,
   status,
+  visible = true,
   onQueryChange,
   onSearch
 }: MapSearchOverlayProps) {
   const isLoading = status === "loading";
 
   return (
-    <section className={styles.searchPanel} aria-label="토지분석 검색">
+    <section
+      className={`${styles.searchPanel} ${visible ? "" : styles.hiddenPanel}`}
+      aria-label="토지분석 검색"
+      aria-hidden={!visible}
+    >
       <div className={styles.searchRow}>
         <input
           className={styles.searchInput}

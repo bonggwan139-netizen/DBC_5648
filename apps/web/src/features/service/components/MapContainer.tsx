@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { requestMockSearch } from "../api/searchMock";
 import { moveMapToResult } from "../lib/mapNavigation";
 import type { MockSearchItem, SearchStatus } from "../types/search";
@@ -89,12 +90,22 @@ export function MapContainer() {
     }
   };
 
+  const resultPanelNode = (
+    <MapResultPanel
+      status={status}
+      resultItem={resultItem}
+      errorMessage={errorMessage}
+      docked
+    />
+  );
+
   return (
     <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
       <div ref={mapRef} className={styles.mapCanvas} />
       <MapSearchOverlay
         query={query}
         status={status}
+        visible={isSearchPanelOpen}
         onQueryChange={setQuery}
         onSearch={handleSearch}
       />
@@ -106,6 +117,8 @@ export function MapContainer() {
         errorMessage={errorMessage}
       />
       <MapStatusBar />
+
+      {resultPanelHost ? createPortal(resultPanelNode, resultPanelHost) : resultPanelNode}
     </section>
   );
 }
