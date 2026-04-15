@@ -12,9 +12,10 @@ type MapResultPanelProps = {
 
 export function MapResultPanel({
   status,
-  resultItem,
-  errorMessage,
-  docked = false
+  results,
+  selectedResultId,
+  onSelectResult,
+  errorMessage
 }: MapResultPanelProps) {
   const selectedItem = results.find((item) => item.id === selectedResultId) ?? null;
 

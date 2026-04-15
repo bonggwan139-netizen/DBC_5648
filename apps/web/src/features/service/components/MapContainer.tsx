@@ -14,14 +14,15 @@ import "maplibre-gl/dist/maplibre-gl.css";
 const INITIAL_CENTER: [number, number] = [126.978, 37.5665];
 const INITIAL_ZOOM = 12;
 
-type MapContainerProps = {
-  isSearchPanelOpen?: boolean;
-  resultPanelHost?: HTMLDivElement | null;
+type FlyToMap = {
+  flyTo: (options: { center: [number, number]; zoom: number; essential?: boolean }) => void;
+  addControl: (control: unknown, position?: string) => void;
+  remove: () => void;
 };
 
-export function MapContainer({ isSearchPanelOpen = true, resultPanelHost = null }: MapContainerProps) {
+export function MapContainer() {
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<MapLibreMap | null>(null);
+  const mapInstanceRef = useRef<FlyToMap | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<SearchStatus>("idle");
   const [results, setResults] = useState<MockSearchItem[]>([]);
@@ -100,12 +101,6 @@ export function MapContainer({ isSearchPanelOpen = true, resultPanelHost = null 
 
   return (
     <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
-      <div className={styles.topToolbar} aria-hidden="true">
-        <button type="button">◻</button>
-        <button type="button">✛</button>
-        <button type="button">⌖</button>
-      </div>
-
       <div ref={mapRef} className={styles.mapCanvas} />
       <MapSearchOverlay
         query={query}
@@ -113,6 +108,13 @@ export function MapContainer({ isSearchPanelOpen = true, resultPanelHost = null 
         visible={isSearchPanelOpen}
         onQueryChange={setQuery}
         onSearch={handleSearch}
+      />
+      <MapResultPanel
+        status={status}
+        results={results}
+        selectedResultId={selectedResultId}
+        onSelectResult={handleSelectResult}
+        errorMessage={errorMessage}
       />
       <MapStatusBar />
 

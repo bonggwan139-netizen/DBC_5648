@@ -1,6 +1,8 @@
-import type { Map as MapLibreMap } from "maplibre-gl";
+type FlyToMap = {
+  flyTo: (options: { center: [number, number]; zoom: number; essential?: boolean }) => void;
+};
 
-export function moveMapToResult(map: MapLibreMap | null, longitude: number, latitude: number): void {
+export function moveMapToResult(map: FlyToMap | null, longitude: number, latitude: number): void {
   if (map === null) {
     return;
   }
