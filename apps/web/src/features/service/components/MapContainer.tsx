@@ -1,33 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { requestMockSearch } from "../api/searchMock";
-import { moveMapToResult } from "../lib/mapNavigation";
-import type { MockSearchItem, SearchStatus } from "../types/search";
+import { useEffect, useRef } from "react";
+import type { Map as MapLibreMap } from "maplibre-gl";
 import styles from "./MapContainer.module.css";
-import { MapResultPanel } from "./MapResultPanel";
-import { MapSearchOverlay } from "./MapSearchOverlay";
-import { MapStatusBar } from "./MapStatusBar";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const INITIAL_CENTER: [number, number] = [126.978, 37.5665];
 const INITIAL_ZOOM = 12;
 
-type FlyToMap = {
-  flyTo: (options: { center: [number, number]; zoom: number; essential?: boolean }) => void;
-  addControl: (control: unknown, position?: string) => void;
-  remove: () => void;
-};
+const TOOL_BUTTONS = ["✥", "⬠", "↕", "◧"];
+const MAP_CONTROLS = ["＋", "－", "◎"];
 
 export function MapContainer() {
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<FlyToMap | null>(null);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<SearchStatus>("idle");
-  const [results, setResults] = useState<MockSearchItem[]>([]);
-  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const mapInstanceRef = useRef<MapLibreMap | null>(null);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -46,7 +32,6 @@ export function MapContainer() {
         zoom: INITIAL_ZOOM
       });
 
-      map.addControl(new maplibregl.NavigationControl(), "top-right");
       mapInstanceRef.current = map;
 
       cleanup = () => {
@@ -100,25 +85,26 @@ export function MapContainer() {
   );
 
   return (
-    <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
+    <section className={styles.mapArea} aria-label="지도 분석 영역">
       <div ref={mapRef} className={styles.mapCanvas} />
-      <MapSearchOverlay
-        query={query}
-        status={status}
-        visible={isSearchPanelOpen}
-        onQueryChange={setQuery}
-        onSearch={handleSearch}
-      />
-      <MapResultPanel
-        status={status}
-        results={results}
-        selectedResultId={selectedResultId}
-        onSelectResult={handleSelectResult}
-        errorMessage={errorMessage}
-      />
-      <MapStatusBar />
 
-      {resultPanelHost ? createPortal(resultPanelNode, resultPanelHost) : resultPanelNode}
+      <div className={styles.topToolbar} aria-label="지도 상단 도구">
+        {TOOL_BUTTONS.map((tool) => (
+          <button key={tool} type="button" className={styles.toolbarButton}>
+            {tool}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.rightControls} aria-label="지도 컨트롤">
+        {MAP_CONTROLS.map((control) => (
+          <button key={control} type="button" className={styles.controlButton}>
+            {control}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.selectionPreview} aria-hidden="true" />
     </section>
   );
 }

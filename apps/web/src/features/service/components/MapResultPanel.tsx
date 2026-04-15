@@ -1,79 +1,30 @@
-import type { MockSearchItem, SearchStatus } from "../types/search";
-import styles from "./MapOverlay.module.css";
-
-type MapResultPanelProps = {
-  status: SearchStatus;
-  results: MockSearchItem[];
-  selectedResultId: string | null;
-  onSelectResult: (item: MockSearchItem) => void;
-  errorMessage: string | null;
-  docked?: boolean;
-};
-
-export function MapResultPanel({
-  status,
-  results,
-  selectedResultId,
-  onSelectResult,
-  errorMessage
-}: MapResultPanelProps) {
-  const selectedItem = results.find((item) => item.id === selectedResultId) ?? null;
-
-  const sectionData = [
-    {
-      title: "선택 대상 정보",
-      value: selectedItem?.targetName ?? "검색 후 선택 대상 정보가 표시됩니다."
-    },
-    {
-      title: "기본 위치 정보",
-      value:
-        selectedItem === null
-          ? "행정구역/지번/도로명 주소가 표시됩니다."
-          : `${selectedItem.lotAddress} · ${selectedItem.roadAddress}`
-    },
-    {
-      title: "분석 결과 요약",
-      value: selectedItem?.summary ?? "분석 요약값이 표시됩니다."
-    },
-    {
-      title: "비고 / 안내 문구",
-      value: selectedItem?.note ?? "주의사항 및 검토 포인트가 표시됩니다."
-    }
-  ];
+import styles from "./MapResultPanel.module.css";
 
   return (
-    <section
-      className={`${styles.resultPanel} ${docked ? styles.resultPanelDocked : ""}`}
-      aria-label="검색 결과 요약 패널"
-    >
-      <h3 className={styles.resultTitle}>검색 결과 요약</h3>
-      <p className={styles.resultStatus}>
-        상태: {status === "idle" ? "대기" : status === "loading" ? "조회중" : status === "success" ? "성공" : "실패"}
-      </p>
-      {selectedItem !== null && <p className={styles.selectedTarget}>선택 대상: {selectedItem.targetName}</p>}
-      {errorMessage !== null && <p className={styles.resultError}>{errorMessage}</p>}
+    <aside className={styles.resultPanel} aria-label="분석 결과 패널">
+      <div className={styles.emptyState}>분석을 실행하면 결과가 이 패널에 표시됩니다.</div>
 
-      <div className={styles.resultList}>
-        {results.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={item.id === selectedResultId ? styles.resultListItemActive : styles.resultListItem}
-            onClick={() => onSelectResult(item)}
-          >
-            {item.targetName}
-          </button>
-        ))}
-      </div>
+      <article className={styles.resultCard}>
+        <h3>분석 요약</h3>
+        <div className={styles.valueGroup}>
+          <p className={styles.label}>면적</p>
+          <p className={styles.value}>0 ㎡</p>
+        </div>
+        <div className={styles.valueGroup}>
+          <p className={styles.label}>위치</p>
+          <p className={styles.value}>선택 대기</p>
+        </div>
+      </article>
 
-      <div className={styles.resultSections}>
-        {sectionData.map((section) => (
-          <article key={section.title} className={styles.resultSectionCard}>
-            <h4>{section.title}</h4>
-            <p>{section.value}</p>
-          </article>
-        ))}
-      </div>
-    </section>
+      <article className={styles.resultCard}>
+        <h3>분석 결과</h3>
+        <div className={styles.placeholderBlock}>확장 가능한 결과 영역</div>
+      </article>
+
+      <article className={styles.resultCard}>
+        <h3>추가 정보</h3>
+        <div className={styles.placeholderBlock}>추가 지표 및 메모 영역</div>
+      </article>
+    </aside>
   );
 }
