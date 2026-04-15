@@ -1,17 +1,24 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { Map as MapLibreMap } from "maplibre-gl";
 import styles from "./MapContainer.module.css";
-import { MapResultPanel } from "./MapResultPanel";
 import { MapSearchOverlay } from "./MapSearchOverlay";
-import { MapStatusBar } from "./MapStatusBar";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const INITIAL_CENTER: [number, number] = [126.978, 37.5665];
 const INITIAL_ZOOM = 12;
 
-export function MapContainer() {
+const TOOL_BUTTONS = ["✥", "⬠", "↕", "◧"];
+
+type MapContainerProps = {
+  isSearchPanelOpen: boolean;
+  onCloseSearchPanel: () => void;
+};
+
+export function MapContainer({ isSearchPanelOpen, onCloseSearchPanel }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<MapLibreMap | null>(null);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -21,7 +28,7 @@ export function MapContainer() {
     let cleanup: (() => void) | undefined;
 
     const setupMap = async () => {
-      const maplibregl = (await import("maplibre-gl")).default;
+      const maplibregl = await import("maplibre-gl");
 
       const map = new maplibregl.Map({
         container: mapRef.current as HTMLDivElement,
@@ -31,8 +38,10 @@ export function MapContainer() {
       });
 
       map.addControl(new maplibregl.NavigationControl(), "top-right");
+      mapInstanceRef.current = map;
 
       cleanup = () => {
+        mapInstanceRef.current = null;
         map.remove();
       };
     };
@@ -45,11 +54,18 @@ export function MapContainer() {
   }, []);
 
   return (
-    <section className={styles.mapArea} aria-label="기본 지도 컨테이너">
+    <section className={styles.mapArea} aria-label="지도 분석 영역">
       <div ref={mapRef} className={styles.mapCanvas} />
-      <MapSearchOverlay />
-      <MapResultPanel />
-      <MapStatusBar />
+
+      <div className={styles.topToolbar} aria-label="지도 상단 도구">
+        {TOOL_BUTTONS.map((tool) => (
+          <button key={tool} type="button" className={styles.toolbarButton}>
+            {tool}
+          </button>
+        ))}
+      </div>
+
+      <MapSearchOverlay isOpen={isSearchPanelOpen} onClose={onCloseSearchPanel} />
     </section>
   );
 }
