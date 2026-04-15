@@ -1,6 +1,5 @@
 import styles from "./MapResultPanel.module.css";
 
-export function MapResultPanel() {
   return (
     <aside className={styles.resultPanel} aria-label="분석 결과 패널">
       <div className={styles.emptyState}>분석을 실행하면 결과가 이 패널에 표시됩니다.</div>
