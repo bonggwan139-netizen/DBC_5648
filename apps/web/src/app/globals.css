@@ -14,30 +14,27 @@ body {
 }
 
 .site-header {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  z-index: 60;
   height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid #d1d5db;
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.header-inner {
-  height: 100%;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.site-header h1 {
+  margin: 0;
+  font-size: 1rem;
 }
 
-.brand-logo {
-  text-decoration: none;
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.main-nav {
+.nav-list {
   display: flex;
   align-items: center;
   gap: 24px;
@@ -47,9 +44,7 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  align-items: center;
-  gap: 24px;
+  margin: 0;
 }
 
 .nav-list a {
@@ -79,314 +74,11 @@ body {
 }
 
 .page-container {
-  padding: 0;
-}
-
-.home-page,
-.about-page {
-  padding-bottom: 32px;
-}
-
-.hero-section {
-  max-width: 1280px;
-  height: 520px;
-  margin: 32px auto 0;
-  padding: 0 24px;
-  display: grid;
-  grid-template-columns: 1.05fr 1fr;
-  gap: 32px;
-  align-items: center;
-}
-
-.hero-left h1 {
-  margin: 0;
-  font-size: 44px;
-  line-height: 1.25;
-  font-weight: 700;
-  color: #111827;
-}
-
-.hero-left p {
-  margin: 20px 0 28px;
-  font-size: 16px;
-  line-height: 1.7;
-  color: #64748b;
-}
-
-.primary-btn {
-  height: 48px;
-  padding: 0 20px;
-  background: #2563eb;
-  color: #ffffff;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
-}
-
-.hero-visual {
-  height: 460px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
-  border: 1px solid #e2e8f0;
+  margin-top: 56px;
+  height: calc(100vh - 56px);
   overflow: hidden;
-  position: relative;
 }
 
-.hero-overlay-card {
-  width: 420px;
-  height: 280px;
-  position: absolute;
-  right: 24px;
-  top: 32px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(6px);
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 16px;
-  z-index: 2;
-}
-
-.overlay-header,
-.overlay-row,
-.overlay-map-chip {
-  border-radius: 8px;
-  background: #e2e8f0;
-}
-
-.overlay-header {
-  height: 18px;
-  width: 45%;
-}
-
-.overlay-row {
-  margin-top: 12px;
-  height: 14px;
-  width: 100%;
-}
-
-.overlay-row.short {
-  width: 72%;
-}
-
-.overlay-map-chip {
-  margin-top: 16px;
-  width: 100%;
-  height: 180px;
-  background: linear-gradient(180deg, #e8f2ff, #dbeafe);
-}
-
-.city-visual {
-  position: absolute;
-  left: -16px;
-  right: -16px;
-  bottom: -34px;
-  width: calc(100% + 32px);
-}
-
-.step-grid {
-  max-width: 1280px;
-  margin: 24px auto 0;
-  padding: 0 24px 48px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.step-card {
-  min-height: 180px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 24px;
-  text-align: center;
-}
-
-.step-number {
-  font-size: 14px;
-  color: #94a3b8;
-  margin: 0 0 8px;
-}
-
-.step-card h3 {
-  margin: 0 0 12px;
-  font-size: 28px;
-  font-weight: 700;
-  color: #2563eb;
-}
-
-.step-card span {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #64748b;
-}
-
-.about-main-section {
-  max-width: 1280px;
-  margin: 32px auto 0;
-  padding: 0 24px;
-  display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
-  gap: 32px;
-  align-items: center;
-  min-height: 520px;
-}
-
-.about-left h2 {
-  margin: 0 0 20px;
-  font-size: 36px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.about-left > p {
-  margin: 0 0 28px;
-  font-size: 16px;
-  line-height: 1.8;
-  color: #64748b;
-}
-
-.feature-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.feature-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 18px 20px;
-}
-
-.feature-card h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.feature-card span {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #64748b;
-}
-
-.about-visual {
-  height: 460px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
-  border: 1px solid #e2e8f0;
-  overflow: hidden;
-  position: relative;
-}
-
-.about-city-visual {
-  position: absolute;
-  left: -20px;
-  right: -20px;
-  bottom: -26px;
-  width: calc(100% + 40px);
-}
-
-.about-overlay-card {
-  width: 460px;
-  height: 300px;
-  position: absolute;
-  right: 24px;
-  top: 28px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  overflow: hidden;
-  z-index: 2;
-  padding: 16px;
-}
-
-.about-overlay-map {
-  width: 100%;
+.service-page-shell {
   height: 100%;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #eff6ff 0%, #e2e8f0 100%);
-  position: relative;
-}
-
-.selection-area {
-  position: absolute;
-  inset: 32% 28% 26% 24%;
-  background: rgba(37, 99, 235, 0.2);
-  border: 2px solid #2563eb;
-  border-radius: 8px;
-}
-
-.about-search-bar {
-  width: 640px;
-  max-width: calc(100% - 48px);
-  height: 52px;
-  margin: 28px auto 0;
-  border-radius: 999px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-}
-
-.search-icon {
-  width: 24px;
-  margin-right: 12px;
-  color: #94a3b8;
-}
-
-.about-search-bar input {
-  flex: 1;
-  border: 0;
-  outline: none;
-  font-size: 15px;
-  color: #111827;
-}
-
-.about-search-bar button {
-  margin-left: auto;
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 0;
-  background: #2563eb;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-@media (max-width: 1024px) {
-  .hero-section,
-  .about-main-section,
-  .step-grid {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
-
-  .hero-visual,
-  .about-visual {
-    min-height: 420px;
-  }
-
-  .hero-overlay-card,
-  .about-overlay-card {
-    width: calc(100% - 48px);
-    right: 24px;
-  }
-}
-
-
-.service-page-shell {
-  margin: -1.5rem;
-}
-
-
-.service-page-shell {
-  margin: -1.5rem;
 }

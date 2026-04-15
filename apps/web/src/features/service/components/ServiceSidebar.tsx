@@ -1,12 +1,18 @@
 import styles from "./ServiceSidebar.module.css";
 
-export function ServiceSidebar() {
+type ServiceSidebarProps = {
+  onOpenSearchPanel: () => void;
+};
+
+export function ServiceSidebar({ onOpenSearchPanel }: ServiceSidebarProps) {
   return (
-    <aside className={styles.sidebar} aria-label="작업 패널">
+    <section className={styles.sidebar} aria-label="작업 패널">
       <section className={styles.stepCard}>
         <header className={styles.stepHeader}>
-          <span className={styles.stepBadge}>1</span>
-          <h3>위치 검색</h3>
+          <button type="button" className={styles.stepButton} onClick={onOpenSearchPanel}>
+            <span className={styles.stepBadge}>1</span>
+            <h3>위치 검색</h3>
+          </button>
         </header>
         <div className={styles.stepContent}>
           <input
@@ -15,7 +21,7 @@ export function ServiceSidebar() {
             placeholder="주소 또는 지번 입력"
             aria-label="위치 검색어 입력"
           />
-          <button className={styles.searchButton} type="button">
+          <button className={styles.searchButton} type="button" onClick={onOpenSearchPanel}>
             검색
           </button>
         </div>
@@ -43,6 +49,6 @@ export function ServiceSidebar() {
           </button>
         </div>
       </section>
-    </aside>
+    </section>
   );
 }

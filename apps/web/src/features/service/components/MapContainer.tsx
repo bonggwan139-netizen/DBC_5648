@@ -3,15 +3,20 @@
 import { useEffect, useRef } from "react";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import styles from "./MapContainer.module.css";
+import { MapSearchOverlay } from "./MapSearchOverlay";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const INITIAL_CENTER: [number, number] = [126.978, 37.5665];
 const INITIAL_ZOOM = 12;
 
 const TOOL_BUTTONS = ["✥", "⬠", "↕", "◧"];
-const MAP_CONTROLS = ["＋", "－", "◎"];
 
-export function MapContainer() {
+type MapContainerProps = {
+  isSearchPanelOpen: boolean;
+  onCloseSearchPanel: () => void;
+};
+
+export function MapContainer({ isSearchPanelOpen, onCloseSearchPanel }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
 
@@ -32,6 +37,7 @@ export function MapContainer() {
         zoom: INITIAL_ZOOM
       });
 
+      map.addControl(new maplibregl.NavigationControl(), "top-right");
       mapInstanceRef.current = map;
 
       cleanup = () => {
@@ -96,15 +102,7 @@ export function MapContainer() {
         ))}
       </div>
 
-      <div className={styles.rightControls} aria-label="지도 컨트롤">
-        {MAP_CONTROLS.map((control) => (
-          <button key={control} type="button" className={styles.controlButton}>
-            {control}
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.selectionPreview} aria-hidden="true" />
+      <MapSearchOverlay isOpen={isSearchPanelOpen} onClose={onCloseSearchPanel} />
     </section>
   );
 }

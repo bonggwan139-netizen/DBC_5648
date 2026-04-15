@@ -2,28 +2,23 @@ import type { SearchStatus } from "../types/search";
 import styles from "./MapOverlay.module.css";
 
 type MapSearchOverlayProps = {
-  query: string;
-  status: SearchStatus;
-  visible?: boolean;
-  onQueryChange: (value: string) => void;
-  onSearch: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 };
 
-export function MapSearchOverlay({
-  query,
-  status,
-  visible = true,
-  onQueryChange,
-  onSearch
-}: MapSearchOverlayProps) {
-  const isLoading = status === "loading";
-
+export function MapSearchOverlay({ isOpen, onClose }: MapSearchOverlayProps) {
   return (
     <section
-      className={`${styles.searchPanel} ${visible ? "" : styles.hiddenPanel}`}
+      className={`${styles.searchPanel} ${isOpen ? styles.searchPanelVisible : styles.searchPanelHidden}`}
       aria-label="토지분석 검색"
-      aria-hidden={!visible}
+      aria-hidden={!isOpen}
     >
+      <div className={styles.searchPanelHeader}>
+        <strong>위치 검색</strong>
+        <button type="button" className={styles.searchCloseButton} onClick={onClose} aria-label="검색 패널 닫기">
+          닫기
+        </button>
+      </div>
       <div className={styles.searchRow}>
         <input
           className={styles.searchInput}

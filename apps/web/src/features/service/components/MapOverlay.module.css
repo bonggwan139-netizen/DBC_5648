@@ -1,9 +1,11 @@
 .searchPanel {
   position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  z-index: 20;
-  width: min(440px, calc(100% - 1.5rem));
+  top: 16px;
+  left: 16px;
+  z-index: 30;
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid #dbe2ea;
   border-radius: 10px;
@@ -12,9 +14,35 @@
   transition: opacity 0.2s ease;
 }
 
-.hiddenPanel {
+.searchPanelVisible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.searchPanelHidden {
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
+}
+
+.searchPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.searchCloseButton {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .searchRow {
@@ -50,32 +78,6 @@
   margin: 0.55rem 0 0;
   color: #475569;
   font-size: 0.8rem;
-}
-
-.resultPanel {
-  position: absolute;
-  top: 6.2rem;
-  left: 0.75rem;
-  z-index: 20;
-  width: min(440px, calc(100% - 1.5rem));
-  max-height: calc(100% - 10rem);
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #dbe2ea;
-  border-radius: 10px;
-  padding: 0.75rem;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
-}
-
-.resultPanelDocked {
-  position: static;
-  left: auto;
-  top: auto;
-  width: 100%;
-  max-height: none;
-  border: 1px solid #e2e8f0;
-  box-shadow: none;
-  background: #ffffff;
 }
 
 .resultTitle {
@@ -169,13 +171,8 @@
 }
 
 @media (max-width: 960px) {
-  .searchPanel,
-  .resultPanel {
-    width: calc(100% - 1.5rem);
-  }
-
-  .resultPanel {
-    max-height: calc(100% - 11.5rem);
+  .searchPanel {
+    width: calc(100% - 32px);
   }
 
   .statusBar {

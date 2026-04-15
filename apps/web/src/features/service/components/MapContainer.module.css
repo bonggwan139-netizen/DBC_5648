@@ -2,6 +2,7 @@
   position: relative;
   background: #e5e7eb;
   overflow: hidden;
+  min-width: 0;
 }
 
 .mapCanvas {
@@ -35,39 +36,6 @@
 
 .toolbarButton:hover {
   background: #e2e8f0;
-}
-
-.rightControls {
-  position: absolute;
-  right: 16px;
-  top: 80px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 20;
-}
-
-.controlButton {
-  width: 40px;
-  height: 40px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  color: #334155;
-  cursor: pointer;
-}
-
-.selectionPreview {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 180px;
-  height: 130px;
-  transform: translate(-50%, -50%);
-  background: rgba(37, 99, 235, 0.2);
-  border: 2px solid #2563eb;
-  border-radius: 6px;
-  pointer-events: none;
 }
 
 @media (max-width: 1080px) {
