@@ -53,6 +53,43 @@ export function MapContainer({ isSearchPanelOpen, onCloseSearchPanel }: MapConta
     };
   }, []);
 
+  const handleSelectResult = (item: MockSearchItem) => {
+    setSelectedResultId(item.id);
+    moveMapToResult(mapInstanceRef.current, item.longitude, item.latitude);
+  };
+
+  const handleSearch = async () => {
+    const trimmedQuery = query.trim();
+
+    if (trimmedQuery.length === 0 || status === "loading") {
+      return;
+    }
+
+    setStatus("loading");
+    setErrorMessage(null);
+
+    try {
+      const response = await requestMockSearch(trimmedQuery);
+      setResults(response.items);
+      setSelectedResultId(null);
+      setStatus("success");
+    } catch {
+      setResults([]);
+      setSelectedResultId(null);
+      setStatus("error");
+      setErrorMessage("검색 요청에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    }
+  };
+
+  const resultPanelNode = (
+    <MapResultPanel
+      status={status}
+      resultItem={resultItem}
+      errorMessage={errorMessage}
+      docked
+    />
+  );
+
   return (
     <section className={styles.mapArea} aria-label="지도 분석 영역">
       <div ref={mapRef} className={styles.mapCanvas} />
