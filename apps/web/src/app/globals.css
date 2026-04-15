@@ -9,14 +9,28 @@
 
 body {
   margin: 0;
-  background: #f7f9fc;
+  background: #f8fafc;
   color: #111827;
 }
 
 .site-header {
-  padding: 1rem 1.5rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
   border-bottom: 1px solid #d1d5db;
   background: #ffffff;
+}
+
+.site-header h1 {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .nav-list {
@@ -24,7 +38,7 @@ body {
   gap: 1rem;
   list-style: none;
   padding: 0;
-  margin: 0.75rem 0 0;
+  margin: 0;
 }
 
 .nav-list a {
@@ -33,5 +47,11 @@ body {
 }
 
 .page-container {
-  padding: 1.5rem;
+  margin-top: 56px;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+}
+
+.service-page-shell {
+  height: 100%;
 }
