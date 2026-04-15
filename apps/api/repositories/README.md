@@ -1,3 +1,5 @@
 # repositories
 
-repositories 레이어의 placeholder 폴더입니다.
+데이터 접근 계층입니다.
+
+- 향후 DB/파일소스 접근 로직을 인터페이스 단위로 분리합니다.
