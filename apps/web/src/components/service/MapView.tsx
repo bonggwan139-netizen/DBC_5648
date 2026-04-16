@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { env, isVworldEnabled } from "@/config/env";
 
-type BaseStyle = "road" | "satellite";
+type MapMode = "road" | "satellite" | "threeD";
 
 type MapLibreMap = {
   addControl: (control: unknown, position?: string) => void;
+  easeTo: (options: Record<string, unknown>) => void;
+  on: (event: string, handler: () => void) => void;
   remove: () => void;
   setLayoutProperty: (layerId: string, name: string, value: string) => void;
 };
@@ -112,7 +114,8 @@ async function loadMapLibre() {
 export function MapView() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const [styleType, setStyleType] = useState<BaseStyle>("road");
+  const [mapMode, setMapMode] = useState<MapMode>("road");
+  const [isMapReady, setIsMapReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,11 +135,14 @@ export function MapView() {
         style: createVworldStyle(env.vworldApiKey),
         center: [127.0276, 37.4979],
         zoom: 11,
+        pitch: 0,
+        bearing: 0,
         minZoom: 6,
         maxZoom: 19
       });
 
       mapRef.current.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+      mapRef.current.on("load", () => setIsMapReady(true));
     };
 
     setupMap();
@@ -145,25 +151,39 @@ export function MapView() {
       cancelled = true;
       mapRef.current?.remove();
       mapRef.current = null;
+      setIsMapReady(false);
     };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current) {
+    if (!mapRef.current || !isMapReady) {
       return;
     }
 
-    mapRef.current.setLayoutProperty(
-      ROAD_LAYER_ID,
-      "visibility",
-      styleType === "road" ? "visible" : "none"
-    );
+    const isRoadMode = mapMode === "road";
+    const isSatelliteMode = mapMode === "satellite" || mapMode === "threeD";
+
+    mapRef.current.setLayoutProperty(ROAD_LAYER_ID, "visibility", isRoadMode ? "visible" : "none");
     mapRef.current.setLayoutProperty(
       SATELLITE_LAYER_ID,
       "visibility",
-      styleType === "satellite" ? "visible" : "none"
+      isSatelliteMode ? "visible" : "none"
     );
-  }, [styleType]);
+
+    mapRef.current.easeTo(
+      mapMode === "threeD"
+        ? {
+            pitch: 60,
+            bearing: -20,
+            duration: 600
+          }
+        : {
+            pitch: 0,
+            bearing: 0,
+            duration: 400
+          }
+    );
+  }, [isMapReady, mapMode]);
 
   if (!isVworldEnabled) {
     return (
@@ -180,25 +200,34 @@ export function MapView() {
       <div className="absolute left-6 top-6 z-10 flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 p-1 shadow-sm backdrop-blur">
         <button
           type="button"
-          onClick={() => setStyleType("road")}
+          onClick={() => setMapMode("road")}
           className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-            styleType === "road"
-              ? "bg-slate-900 text-white"
-              : "bg-transparent text-slate-600 hover:bg-slate-100"
+            mapMode === "road" ? "bg-slate-900 text-white" : "bg-transparent text-slate-600 hover:bg-slate-100"
           }`}
         >
           그림지도
         </button>
         <button
           type="button"
-          onClick={() => setStyleType("satellite")}
+          onClick={() => setMapMode("satellite")}
           className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-            styleType === "satellite"
+            mapMode === "satellite"
               ? "bg-slate-900 text-white"
               : "bg-transparent text-slate-600 hover:bg-slate-100"
           }`}
         >
           위성지도
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapMode("threeD")}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+            mapMode === "threeD"
+              ? "bg-slate-900 text-white"
+              : "bg-transparent text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          3D지도
         </button>
       </div>
 
