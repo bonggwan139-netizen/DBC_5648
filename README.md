@@ -35,3 +35,5 @@ NEXT_PUBLIC_VWORLD_REFERRER=https://dbc-5648.vercel.app
 ```
 
 > Keep database credentials (e.g. PostGIS password) as server-only env variables without `NEXT_PUBLIC_`.
+
+For this repository, a temporary fallback key/referrer is wired in `apps/web/src/config/env.ts`; set `NEXT_PUBLIC_VWORLD_API_KEY` in Vercel to override it per environment.
