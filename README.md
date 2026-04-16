@@ -25,3 +25,13 @@ npm run dev
 Open (local): `http://localhost:3000`
 
 Production: deploy on Vercel and use the generated `https://<project>.vercel.app` URL.
+
+### VWorld map environment variables
+Set these in Vercel (Production) or local `.env` if needed:
+
+```bash
+NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_key
+NEXT_PUBLIC_VWORLD_REFERRER=https://dbc-5648.vercel.app
+```
+
+> Keep database credentials (e.g. PostGIS password) as server-only env variables without `NEXT_PUBLIC_`.
