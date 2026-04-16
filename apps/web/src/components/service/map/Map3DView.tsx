@@ -28,8 +28,33 @@ export function Map3DView() {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
-      html, body, #vworld-3d { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #020617; }
-      #fallback { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #fff; font: 14px sans-serif; background: #0f172a; }
+      html, body, #vworld-3d {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #020617;
+      }
+
+      #vworld-3d * {
+        box-sizing: border-box;
+      }
+
+      canvas {
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      #fallback {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font: 14px sans-serif;
+        background: #0f172a;
+      }
     </style>
     <script>
       (function interceptDocumentWrite() {
@@ -62,9 +87,18 @@ export function Map3DView() {
                   new window.vw.Direction(0, -90, 0)
                 ),
                 logo: true,
-                navigation: true
+                navigation: true,
+                width: '100%',
+                height: '100%'
               });
               map.start();
+
+              var mapRoot = document.getElementById('vworld-3d');
+              if (mapRoot) {
+                mapRoot.style.width = '100%';
+                mapRoot.style.height = '100%';
+                mapRoot.style.position = 'relative';
+              }
             } catch (error) {
               var fallback = document.getElementById('fallback');
               if (fallback) fallback.style.display = 'flex';
