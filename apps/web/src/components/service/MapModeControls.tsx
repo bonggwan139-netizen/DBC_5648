@@ -1,28 +1,33 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
 
-export function MapModeControls() {
-  const [is2DCardOpen, setIs2DCardOpen] = useState(false);
-  const [mapMode, setMapMode] = useState<"2d" | "3d">("2d");
+type BasemapType = "graphic" | "satellite";
+type MapMode = "2d" | "3d";
 
-  const handle2DClick = () => {
-    setMapMode("2d");
-    setIs2DCardOpen((prev) => !prev);
-  };
+type MapModeControlsProps = {
+  mapMode: MapMode;
+  basemap: BasemapType;
+  is2DCardOpen: boolean;
+  onToggle2DCard: () => void;
+  onClick3D: () => void;
+  onSelectBasemap: (type: BasemapType) => void;
+};
 
-  const handle3DClick = () => {
-    setMapMode("3d");
-    setIs2DCardOpen(false);
-  };
-
+export function MapModeControls({
+  mapMode,
+  basemap,
+  is2DCardOpen,
+  onToggle2DCard,
+  onClick3D,
+  onSelectBasemap
+}: MapModeControlsProps) {
   return (
     <div className="absolute left-6 top-5 z-[1300] flex flex-col items-start gap-2">
       <div className="flex items-center overflow-hidden rounded-xl border border-slate-300 bg-white/95 p-1 shadow-md backdrop-blur-sm">
         <button
           type="button"
-          onClick={handle2DClick}
+          onClick={onToggle2DCard}
           className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
             mapMode === "2d" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
           }`}
@@ -31,7 +36,7 @@ export function MapModeControls() {
         </button>
         <button
           type="button"
-          onClick={handle3DClick}
+          onClick={onClick3D}
           className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
             mapMode === "3d" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
           }`}
@@ -52,13 +57,19 @@ export function MapModeControls() {
             <div className="flex min-w-[120px] flex-col gap-1 p-1">
               <button
                 type="button"
-                className="rounded-lg bg-slate-900 px-4 py-1.5 text-left text-sm font-semibold text-white"
+                onClick={() => onSelectBasemap("graphic")}
+                className={`rounded-lg px-4 py-1.5 text-left text-sm font-semibold transition ${
+                  basemap === "graphic" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
+                }`}
               >
                 그림지도
               </button>
               <button
                 type="button"
-                className="rounded-lg px-4 py-1.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                onClick={() => onSelectBasemap("satellite")}
+                className={`rounded-lg px-4 py-1.5 text-left text-sm font-semibold transition ${
+                  basemap === "satellite" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
+                }`}
               >
                 위성지도
               </button>
