@@ -32,7 +32,7 @@ Set these in Vercel (Production) or local `.env` if needed:
 ```bash
 NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_key
 NEXT_PUBLIC_VWORLD_REFERRER=https://dbc-5648.vercel.app
-NEXT_PUBLIC_VWORLD_3D_URL=https://map.vworld.kr/map3d.do
+NEXT_PUBLIC_VWORLD_3D_BOOTSTRAP_URL=https://map.vworld.kr/js/webglMapInit.js.do
 ```
 
 > Keep database credentials (e.g. PostGIS password) as server-only env variables without `NEXT_PUBLIC_`.
