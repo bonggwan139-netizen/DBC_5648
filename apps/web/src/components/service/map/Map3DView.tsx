@@ -15,7 +15,7 @@ function escapeHtml(value: string) {
 export function Map3DView() {
   const srcDoc = useMemo(() => {
     const params = new URLSearchParams({
-      version: "3.0",
+      version: env.vworld3dVersion,
       apiKey: env.vworldApiKey,
       domain: env.vworldDomain
     });
@@ -87,7 +87,7 @@ export function Map3DView() {
     <div className="relative h-full w-full bg-slate-950">
       <iframe title="VWorld 3D Map" srcDoc={srcDoc} className="h-full w-full border-0" allowFullScreen />
       <p className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-black/55 px-2 py-1 text-[11px] text-white/90 backdrop-blur">
-        VWorld 3D API 3.0 Connected{env.vworldReferrer ? ` · ${env.vworldReferrer}` : ""}
+        VWorld 3D API {env.vworld3dVersion} Connected{env.vworldReferrer ? ` · ${env.vworldReferrer}` : ""}
       </p>
     </div>
   );
