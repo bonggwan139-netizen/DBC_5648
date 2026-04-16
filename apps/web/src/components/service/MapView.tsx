@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { env, isVworldEnabled } from "@/config/env";
 
 type BaseStyle = "road" | "satellite";
 
 type MapLibreMap = {
-  setStyle: (style: unknown) => void;
   addControl: (control: unknown, position?: string) => void;
   remove: () => void;
+  setLayoutProperty: (layerId: string, name: string, value: string) => void;
 };
 
 type MapLibreNamespace = {
@@ -21,46 +22,46 @@ declare global {
   }
 }
 
-const ROAD_STYLE = {
-  version: 8,
-  sources: {
-    cartoLight: {
-      type: "raster",
-      tiles: ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-    }
-  },
-  layers: [
-    {
-      id: "cartoLight",
-      type: "raster",
-      source: "cartoLight"
-    }
-  ]
-};
+const ROAD_LAYER_ID = "vworld-road-layer";
+const SATELLITE_LAYER_ID = "vworld-satellite-layer";
 
-const SATELLITE_STYLE = {
-  version: 8,
-  sources: {
-    esriWorldImagery: {
-      type: "raster",
-      tiles: [
-        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      ],
-      tileSize: 256,
-      attribution: "Tiles &copy; Esri"
-    }
-  },
-  layers: [
-    {
-      id: "esriWorldImagery",
-      type: "raster",
-      source: "esriWorldImagery"
-    }
-  ]
-};
+function createVworldStyle(vworldApiKey: string) {
+  return {
+    version: 8,
+    sources: {
+      vworldRoad: {
+        type: "raster",
+        tiles: [`https://api.vworld.kr/req/wmts/1.0.0/${vworldApiKey}/Base/{z}/{y}/{x}.png`],
+        tileSize: 256,
+        attribution: "&copy; VWorld"
+      },
+      vworldSatellite: {
+        type: "raster",
+        tiles: [`https://api.vworld.kr/req/wmts/1.0.0/${vworldApiKey}/Satellite/{z}/{y}/{x}.jpeg`],
+        tileSize: 256,
+        attribution: "&copy; VWorld"
+      }
+    },
+    layers: [
+      {
+        id: ROAD_LAYER_ID,
+        type: "raster",
+        source: "vworldRoad",
+        layout: {
+          visibility: "visible"
+        }
+      },
+      {
+        id: SATELLITE_LAYER_ID,
+        type: "raster",
+        source: "vworldSatellite",
+        layout: {
+          visibility: "none"
+        }
+      }
+    ]
+  };
+}
 
 async function loadMapLibre() {
   if (window.maplibregl) {
@@ -112,15 +113,12 @@ export function MapView() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [styleType, setStyleType] = useState<BaseStyle>("road");
-  const [mapReady, setMapReady] = useState(false);
-
-  const style = useMemo(() => (styleType === "road" ? ROAD_STYLE : SATELLITE_STYLE), [styleType]);
 
   useEffect(() => {
     let cancelled = false;
 
     const setupMap = async () => {
-      if (!mapContainerRef.current || mapRef.current) {
+      if (!mapContainerRef.current || mapRef.current || !isVworldEnabled) {
         return;
       }
 
@@ -131,7 +129,7 @@ export function MapView() {
 
       mapRef.current = new maplibregl.Map({
         container: mapContainerRef.current,
-        style,
+        style: createVworldStyle(env.vworldApiKey),
         center: [127.0276, 37.4979],
         zoom: 11,
         minZoom: 6,
@@ -139,7 +137,6 @@ export function MapView() {
       });
 
       mapRef.current.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
-      setMapReady(true);
     };
 
     setupMap();
@@ -148,17 +145,33 @@ export function MapView() {
       cancelled = true;
       mapRef.current?.remove();
       mapRef.current = null;
-      setMapReady(false);
     };
-  }, [style]);
+  }, []);
 
   useEffect(() => {
-    if (!mapRef.current || !mapReady) {
+    if (!mapRef.current) {
       return;
     }
 
-    mapRef.current.setStyle(style);
-  }, [mapReady, style]);
+    mapRef.current.setLayoutProperty(
+      ROAD_LAYER_ID,
+      "visibility",
+      styleType === "road" ? "visible" : "none"
+    );
+    mapRef.current.setLayoutProperty(
+      SATELLITE_LAYER_ID,
+      "visibility",
+      styleType === "satellite" ? "visible" : "none"
+    );
+  }, [styleType]);
+
+  if (!isVworldEnabled) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-slate-100 p-8 text-center text-sm text-slate-600">
+        NEXT_PUBLIC_VWORLD_API_KEY 값이 없어 지도를 표시할 수 없습니다.
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full w-full">
@@ -188,6 +201,12 @@ export function MapView() {
           위성지도
         </button>
       </div>
+
+      {env.vworldReferrer ? (
+        <p className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-white/80 px-2 py-1 text-[10px] text-slate-500 backdrop-blur">
+          Referrer: {env.vworldReferrer}
+        </p>
+      ) : null}
     </div>
   );
 }
