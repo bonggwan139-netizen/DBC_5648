@@ -73,11 +73,11 @@ export function Map2DView() {
     <div className="relative h-full w-full">
       <div ref={mapContainerRef} className="h-full w-full" />
 
-      <div className="absolute left-6 top-6 z-10 flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 p-1 shadow-sm backdrop-blur">
+      <div className="absolute left-6 top-[43px] z-10 flex items-center gap-1 rounded-[14px] border border-slate-200 bg-white/92 p-[2px] shadow-sm backdrop-blur">
         <button
           type="button"
           onClick={() => setStyleType("road")}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+          className={`rounded-full px-3 py-0.5 text-[11px] font-semibold leading-5 transition ${
             styleType === "road"
               ? "bg-slate-900 text-white"
               : "bg-transparent text-slate-600 hover:bg-slate-100"
@@ -88,7 +88,7 @@ export function Map2DView() {
         <button
           type="button"
           onClick={() => setStyleType("satellite")}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+          className={`rounded-full px-3 py-0.5 text-[11px] font-semibold leading-5 transition ${
             styleType === "satellite"
               ? "bg-slate-900 text-white"
               : "bg-transparent text-slate-600 hover:bg-slate-100"

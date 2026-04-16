@@ -1,5 +1,5 @@
 import { CollapsiblePanel } from "@/components/service/CollapsiblePanel";
-import { MapViewport } from "@/components/service/MapViewport";
+import { MapView } from "@/components/service/MapView";
 
 export default function DbcMapServicePage() {
   return (
@@ -8,7 +8,7 @@ export default function DbcMapServicePage() {
         <CollapsiblePanel />
 
         <div className="relative flex-1 overflow-hidden">
-          <MapViewport />
+          <MapView />
         </div>
       </div>
     </section>

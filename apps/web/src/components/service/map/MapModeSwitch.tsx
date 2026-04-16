@@ -7,11 +7,11 @@ type Props = {
 
 export function MapModeSwitch({ mode, onChange }: Props) {
   return (
-    <div className="absolute right-6 top-6 z-10 flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 p-1 shadow-sm backdrop-blur">
+    <div className="absolute left-6 top-5 z-10 flex items-center gap-1 rounded-[14px] border border-slate-200 bg-white/92 p-[2px] shadow-sm backdrop-blur">
       <button
         type="button"
         onClick={() => onChange("map2d")}
-        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+        className={`rounded-full px-3 py-0.5 text-[11px] font-semibold leading-5 transition ${
           mode === "map2d" ? "bg-slate-900 text-white" : "bg-transparent text-slate-600 hover:bg-slate-100"
         }`}
       >
@@ -20,7 +20,7 @@ export function MapModeSwitch({ mode, onChange }: Props) {
       <button
         type="button"
         onClick={() => onChange("map3d")}
-        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+        className={`rounded-full px-3 py-0.5 text-[11px] font-semibold leading-5 transition ${
           mode === "map3d" ? "bg-slate-900 text-white" : "bg-transparent text-slate-600 hover:bg-slate-100"
         }`}
       >
