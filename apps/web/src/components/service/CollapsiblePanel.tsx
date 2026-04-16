@@ -45,10 +45,16 @@ export function CollapsiblePanel() {
         type="button"
         aria-label={collapsed ? "Expand panel" : "Collapse panel"}
         onClick={() => setCollapsed((prev) => !prev)}
-        className="absolute -right-[18px] top-1/2 z-[1200] flex h-9 w-10 -translate-y-1/2 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+        className="absolute -right-[14px] top-1/2 z-[1200] flex h-12 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
       >
-        <motion.span animate={{ rotate: collapsed ? 180 : 0 }} transition={{ duration: 0.25 }}>
-          ◀
+        <motion.span
+          animate={{ rotate: collapsed ? 180 : 0 }}
+          transition={{ duration: 0.25 }}
+          className="flex items-center justify-center"
+        >
+          <svg viewBox="0 0 12 16" className="h-5 w-3" fill="none" aria-hidden="true">
+            <path d="M9.5 2.5 3.5 8l6 5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </motion.span>
       </button>
     </motion.aside>
