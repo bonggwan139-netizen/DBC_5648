@@ -14,8 +14,13 @@ function escapeHtml(value: string) {
 
 export function Map3DView() {
   const srcDoc = useMemo(() => {
-    const apiKey = escapeHtml(env.vworldApiKey);
-    const bootstrapUrl = escapeHtml(env.vworld3dBootstrapUrl);
+    const params = new URLSearchParams({
+      version: "3.0",
+      apiKey: env.vworldApiKey,
+      domain: env.vworldDomain
+    });
+
+    const bootstrapSrc = escapeHtml(`${env.vworld3dBootstrapUrl}?${params.toString()}`);
 
     return `<!doctype html>
 <html lang="ko">
@@ -24,25 +29,21 @@ export function Map3DView() {
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
       html, body, #vworld-3d { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #020617; }
-      .fallback { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: white; font: 14px sans-serif; background: #0f172a; }
+      #fallback { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #fff; font: 14px sans-serif; background: #0f172a; }
     </style>
-    <script src="${bootstrapUrl}?version=3.0&apiKey=${apiKey}"></script>
+    <script src="${bootstrapSrc}"></script>
   </head>
   <body>
     <div id="vworld-3d"></div>
-    <div id="fallback" class="fallback">브이월드 3D 초기화에 실패했습니다.</div>
+    <div id="fallback">브이월드 3D 초기화에 실패했습니다.</div>
     <script>
-      (function initVworld3D() {
-        var maxRetry = 80;
-        var retry = 0;
+      (function () {
+        var tries = 0;
+        var timer = setInterval(function () {
+          tries += 1;
 
-        function showFallback() {
-          var fallback = document.getElementById('fallback');
-          if (fallback) fallback.style.display = 'flex';
-        }
-
-        function tryInit() {
           if (window.vw && window.vw.Map) {
+            clearInterval(timer);
             try {
               var map = new window.vw.Map();
               map.setOption({
@@ -55,22 +56,19 @@ export function Map3DView() {
                 navigation: true
               });
               map.start();
-            } catch (e) {
-              showFallback();
+            } catch (error) {
+              var fallback = document.getElementById('fallback');
+              if (fallback) fallback.style.display = 'flex';
             }
             return;
           }
 
-          retry += 1;
-          if (retry > maxRetry) {
-            showFallback();
-            return;
+          if (tries > 80) {
+            clearInterval(timer);
+            var fallback = document.getElementById('fallback');
+            if (fallback) fallback.style.display = 'flex';
           }
-
-          setTimeout(tryInit, 100);
-        }
-
-        tryInit();
+        }, 100);
       })();
     </script>
   </body>

@@ -32,6 +32,7 @@ Set these in Vercel (Production) or local `.env` if needed:
 ```bash
 NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_key
 NEXT_PUBLIC_VWORLD_REFERRER=https://dbc-5648.vercel.app
+NEXT_PUBLIC_VWORLD_DOMAIN=dbc-5648.vercel.app
 NEXT_PUBLIC_VWORLD_3D_BOOTSTRAP_URL=https://map.vworld.kr/js/webglMapInit.js.do
 ```
 
