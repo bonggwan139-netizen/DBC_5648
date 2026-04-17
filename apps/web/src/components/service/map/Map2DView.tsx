@@ -45,7 +45,7 @@ function buildWfsUrl(map: MapLibreMap) {
     TYPENAME: "lp_pa_cbnd_bubun",
     SRSNAME: "EPSG:4326",
     OUTPUT: "json",
-    MAXFEATURES: "1200",
+    MAXFEATURES: "1000",
     BBOX: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()},EPSG:4326`,
     KEY: env.vworldApiKey,
     DOMAIN: vworldDomain
