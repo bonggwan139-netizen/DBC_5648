@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { env, isVworldEnabled } from "@/config/env";
+import { getPublicMapEnvErrorMessage, isMapRenderable, mapPublicEnv, missingPublicMapEnvKeys } from "./config/publicEnv";
+import { MAP_DEFAULT_CENTER, MAP_WFS_MIN_ZOOM, MAP_WFS_MOVEEND_DEBOUNCE_MS } from "./config/constants";
 import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
 import { createVworldStyle, ROAD_LAYER_ID, SATELLITE_LAYER_ID } from "./vworldStyle";
 import type { Base2DStyle } from "./types";
@@ -33,24 +34,6 @@ function createEmptyFeatureCollection(): FeatureCollectionLike {
   };
 }
 
-function buildWfsUrl(map: MapLibreMap) {
-  const bounds = map.getBounds();
-  const params = new URLSearchParams({
-    SERVICE: "WFS",
-    REQUEST: "GetFeature",
-    VERSION: "1.1.0",
-    TYPENAME: "lp_pa_cbnd_bubun",
-    SRSNAME: "EPSG:4326",
-    OUTPUT: "json",
-    MAXFEATURES: "1200",
-    BBOX: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`,
-    KEY: env.vworldApiKey,
-    DOMAIN: env.vworldDomain
-  });
-
-  return `https://api.vworld.kr/req/wfs?${params.toString()}`;
-}
-
 function toFeatureCollection(data: unknown): FeatureCollectionLike {
   if (
     data &&
@@ -70,18 +53,79 @@ function pickParcelId(props: ParcelProps) {
   return found ? String(props[found]) : null;
 }
 
+function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: string | null = null): FeatureCollectionLike {
+  return {
+    ...fc,
+    features: fc.features.map((feature) => {
+      const props = (feature.properties ?? {}) as ParcelProps;
+      const featureId = pickParcelId(props);
+
+      return {
+        ...feature,
+        properties: {
+          ...props,
+          _parcel_id: featureId,
+          _selected: selectedId !== null && featureId === selectedId
+        }
+      };
+    })
+  };
+}
+
+function createBoundsKey(map: MapLibreMap) {
+  const bounds = map.getBounds();
+  return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
+    .map((v) => v.toFixed(6))
+    .join(",");
+}
+
+function buildProxyWfsUrl(map: MapLibreMap) {
+  const bounds = map.getBounds();
+  const params = new URLSearchParams({
+    bbox: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`,
+    maxFeatures: "1000"
+  });
+
+  return `/api/vworld/wfs?${params.toString()}`;
+}
+
+async function fetchWfsFeatureCollection(map: MapLibreMap, signal?: AbortSignal): Promise<FeatureCollectionLike> {
+  const res = await fetch(buildProxyWfsUrl(map), {
+    method: "GET",
+    signal,
+    cache: "no-store"
+  });
+
+  const payload = (await res.json().catch(() => null)) as
+    | FeatureCollectionLike
+    | { error?: string; message?: string }
+    | null;
+
+  if (!res.ok) {
+    const message = payload && typeof payload === "object" && "message" in payload ? payload.message : undefined;
+    throw new Error(message || `WFS request failed: ${res.status}`);
+  }
+
+  return toFeatureCollection(payload);
+}
+
 export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const pendingFetchRef = useRef<AbortController | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
+  const lastBoundsKeyRef = useRef<string>("");
+
   const [styleType, setStyleType] = useState<Base2DStyle>("road");
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
+  const [wfsError, setWfsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     const setupMap = async () => {
-      if (!mapContainerRef.current || mapRef.current || !isVworldEnabled) {
+      if (!mapContainerRef.current || mapRef.current || !isMapRenderable) {
         return;
       }
 
@@ -92,8 +136,8 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
       const map = new maplibregl.Map({
         container: mapContainerRef.current,
-        style: createVworldStyle(env.vworldApiKey),
-        center: [127.0276, 37.4979],
+        style: createVworldStyle(mapPublicEnv.vworldApiKey),
+        center: MAP_DEFAULT_CENTER,
         zoom: 16,
         minZoom: 6,
         maxZoom: 19
@@ -141,55 +185,61 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           }
         });
 
-        const refreshWfs = async () => {
-          if (!mapRef.current) {
-            return;
-          }
+        const setSourceData = (data: FeatureCollectionLike) => {
+          const source = map.getSource(WFS_SOURCE_ID) as { setData?: (next: FeatureCollectionLike) => void } | undefined;
+          source?.setData?.(data);
+        };
 
-          if ((map as unknown as { getBounds: () => unknown }).getBounds === undefined) {
-            return;
-          }
-
-          if ((map as unknown as { getBounds: () => { getWest: () => number } }).getBounds().getWest === undefined) {
-            return;
-          }
-
-          // 줌아웃에서는 피처량 폭증 방지를 위해 요청하지 않음
+        const refreshWfs = async (selectedId: string | null = null, force = false) => {
           const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
-          if (currentZoom < 14) {
-            map.getSource(WFS_SOURCE_ID)?.setData(createEmptyFeatureCollection());
+          if (currentZoom < MAP_WFS_MIN_ZOOM) {
+            lastBoundsKeyRef.current = "";
+            setSourceData(createEmptyFeatureCollection());
+            setWfsError(null);
             return;
           }
+
+          const boundsKey = createBoundsKey(map);
+          if (!force && boundsKey === lastBoundsKeyRef.current) {
+            return;
+          }
+
+          lastBoundsKeyRef.current = boundsKey;
+          pendingFetchRef.current?.abort();
+          const controller = new AbortController();
+          pendingFetchRef.current = controller;
 
           try {
-            const res = await fetch(buildWfsUrl(map));
-            const json = await res.json();
-            const fc = toFeatureCollection(json);
+            const fc = await fetchWfsFeatureCollection(map, controller.signal);
+            if (controller.signal.aborted) {
+              return;
+            }
 
-            const normalized: FeatureCollectionLike = {
-              ...fc,
-              features: fc.features.map((feature) => {
-                const props = (feature.properties ?? {}) as ParcelProps;
-                return {
-                  ...feature,
-                  properties: {
-                    ...props,
-                    _parcel_id: pickParcelId(props),
-                    _selected: false
-                  }
-                };
-              })
-            };
+            setSourceData(normalizeFeatureCollection(fc, selectedId));
+            setWfsError(null);
+          } catch (error) {
+            if (controller.signal.aborted) {
+              return;
+            }
 
-            map.getSource(WFS_SOURCE_ID)?.setData(normalized);
-          } catch {
-            map.getSource(WFS_SOURCE_ID)?.setData(createEmptyFeatureCollection());
+            setSourceData(createEmptyFeatureCollection());
+            setWfsError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
           }
         };
 
-        map.on("moveend", refreshWfs);
+        const scheduleRefreshWfs = () => {
+          if (debounceTimerRef.current !== null) {
+            window.clearTimeout(debounceTimerRef.current);
+          }
 
-        map.on("click", WFS_FILL_LAYER_ID, (event: unknown) => {
+          debounceTimerRef.current = window.setTimeout(() => {
+            void refreshWfs(null, false);
+          }, MAP_WFS_MOVEEND_DEBOUNCE_MS);
+        };
+
+        map.on("moveend", scheduleRefreshWfs);
+
+        const handleParcelClick = (event: unknown) => {
           const e = event as {
             features?: Array<{ properties?: ParcelProps }>;
           };
@@ -201,49 +251,27 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           const picked = (e.features[0].properties ?? {}) as ParcelProps;
           const pickedId = pickParcelId(picked);
           setSelectedParcel(picked);
+          void refreshWfs(pickedId, true);
+        };
 
-          const source = map.getSource(WFS_SOURCE_ID);
-          if (!source) {
-            return;
-          }
+        map.on("click", WFS_FILL_LAYER_ID, handleParcelClick);
+        map.on("click", WFS_FILL_ACTIVE_LAYER_ID, handleParcelClick);
 
-          const current = source as { setData: (data: FeatureCollectionLike) => void };
-
-          fetch(buildWfsUrl(map))
-            .then((r) => r.json())
-            .then((json) => {
-              const fc = toFeatureCollection(json);
-              const marked: FeatureCollectionLike = {
-                ...fc,
-                features: fc.features.map((feature) => {
-                  const props = (feature.properties ?? {}) as ParcelProps;
-                  const featureId = pickParcelId(props);
-                  return {
-                    ...feature,
-                    properties: {
-                      ...props,
-                      _parcel_id: featureId,
-                      _selected: featureId !== null && featureId === pickedId
-                    }
-                  };
-                })
-              };
-              current.setData(marked);
-            })
-            .catch(() => {});
-        });
-
-        refreshWfs();
+        void refreshWfs();
         setIsMapReady(true);
       });
 
       mapRef.current = map;
     };
 
-    setupMap();
+    void setupMap();
 
     return () => {
       cancelled = true;
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+      pendingFetchRef.current?.abort();
       mapRef.current?.remove();
       mapRef.current = null;
       setIsMapReady(false);
@@ -263,10 +291,16 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     );
   }, [isMapReady, styleType]);
 
-  if (!isVworldEnabled) {
+  if (!isMapRenderable) {
+    const errorMessage = getPublicMapEnvErrorMessage();
     return (
       <div className="flex h-full w-full items-center justify-center bg-slate-100 p-8 text-center text-sm text-slate-600">
-        NEXT_PUBLIC_VWORLD_API_KEY 값이 없어 지도를 표시할 수 없습니다.
+        <div>
+          <p>{errorMessage ?? "지도 환경변수 설정이 필요합니다."}</p>
+          {missingPublicMapEnvKeys.length > 0 ? (
+            <p className="mt-2 text-xs text-slate-500">Missing: {missingPublicMapEnvKeys.map((x) => x.key).join(", ")}</p>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -308,6 +342,13 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         <p className="mt-1">클릭 시 속성 확인 가능</p>
       </div>
 
+      {wfsError ? (
+        <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-rose-200 bg-white/95 p-3 text-[11px] text-rose-700 shadow-sm backdrop-blur">
+          <p className="font-semibold">지적도 조회 오류</p>
+          <p className="mt-1 break-words">{wfsError}</p>
+        </div>
+      ) : null}
+
       {selectedParcel ? (
         <div className="absolute bottom-5 left-6 z-10 w-[340px] rounded-xl border border-slate-200 bg-white/95 p-3 text-[11px] text-slate-700 shadow-sm backdrop-blur">
           <p className="font-semibold">선택 필지 속성</p>
@@ -317,9 +358,9 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         </div>
       ) : null}
 
-      {env.vworldReferrer ? (
+      {mapPublicEnv.vworldReferrer ? (
         <p className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-white/80 px-2 py-1 text-[10px] text-slate-500 backdrop-blur">
-          Referrer: {env.vworldReferrer}
+          Referrer: {mapPublicEnv.vworldReferrer}
         </p>
       ) : null}
     </div>

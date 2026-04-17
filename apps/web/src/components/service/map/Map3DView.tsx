@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { env, isVworldEnabled } from "@/config/env";
+import { getPublicMapEnvErrorMessage, isMapRenderable, mapPublicEnv, missingPublicMapEnvKeys } from "./config/publicEnv";
 
 function escapeHtml(value: string) {
   return value
@@ -15,12 +15,12 @@ function escapeHtml(value: string) {
 export function Map3DView() {
   const srcDoc = useMemo(() => {
     const params = new URLSearchParams({
-      version: env.vworld3dVersion,
-      apiKey: env.vworldApiKey,
-      domain: env.vworldDomain
+      version: mapPublicEnv.vworld3dVersion,
+      apiKey: mapPublicEnv.vworldApiKey,
+      domain: mapPublicEnv.vworldDomain
     });
 
-    const bootstrapSrc = escapeHtml(`${env.vworld3dBootstrapUrl}?${params.toString()}`);
+    const bootstrapSrc = escapeHtml(`${mapPublicEnv.vworld3dBootstrapUrl}?${params.toString()}`);
 
     return `<!doctype html>
 <html lang="ko">
@@ -118,10 +118,16 @@ export function Map3DView() {
 </html>`;
   }, []);
 
-  if (!isVworldEnabled) {
+  if (!isMapRenderable) {
+    const errorMessage = getPublicMapEnvErrorMessage();
     return (
       <div className="flex h-full w-full items-center justify-center bg-slate-100 p-8 text-center text-sm text-slate-600">
-        NEXT_PUBLIC_VWORLD_API_KEY 값이 없어 3D 지도를 표시할 수 없습니다.
+        <div>
+          <p>{errorMessage ?? "3D 지도 환경변수 설정이 필요합니다."}</p>
+          {missingPublicMapEnvKeys.length > 0 ? (
+            <p className="mt-2 text-xs text-slate-500">Missing: {missingPublicMapEnvKeys.map((x) => x.key).join(", ")}</p>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -130,7 +136,8 @@ export function Map3DView() {
     <div className="relative h-full w-full bg-slate-950">
       <iframe title="VWorld 3D Map" srcDoc={srcDoc} className="h-full w-full border-0" allowFullScreen />
       <p className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-black/55 px-2 py-1 text-[11px] text-white/90 backdrop-blur">
-        VWorld 3D API {env.vworld3dVersion} Connected{env.vworldReferrer ? ` · ${env.vworldReferrer}` : ""}
+        VWorld 3D API {mapPublicEnv.vworld3dVersion} Connected
+        {mapPublicEnv.vworldReferrer ? ` · ${mapPublicEnv.vworldReferrer}` : ""}
       </p>
     </div>
   );
