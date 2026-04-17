@@ -1,6 +1,19 @@
 export type MapLibreMap = {
   addControl: (control: unknown, position?: string) => void;
-  on: (event: string, handler: () => void) => void;
+  addLayer: (layer: Record<string, unknown>) => void;
+  addSource: (id: string, source: Record<string, unknown>) => void;
+  getBounds: () => {
+    getWest: () => number;
+    getSouth: () => number;
+    getEast: () => number;
+    getNorth: () => number;
+  };
+  getSource: (id: string) =>
+    | {
+        setData: (data: GeoJSON.FeatureCollection) => void;
+      }
+    | undefined;
+  on: (...args: unknown[]) => void;
   remove: () => void;
   setLayoutProperty: (layerId: string, name: string, value: string) => void;
 };
