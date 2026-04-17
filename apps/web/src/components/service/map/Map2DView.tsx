@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { env, isVworldEnabled } from "@/config/env";
+import { getPublicMapEnvErrorMessage, isMapRenderable, mapPublicEnv, missingPublicMapEnvKeys } from "./config/publicEnv";
+import { MAP_DEFAULT_CENTER, MAP_WFS_MIN_ZOOM, MAP_WFS_MOVEEND_DEBOUNCE_MS } from "./config/constants";
 import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
 import { createVworldStyle, ROAD_LAYER_ID, SATELLITE_LAYER_ID } from "./vworldStyle";
 import type { Base2DStyle } from "./types";
@@ -125,7 +126,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     let cancelled = false;
 
     const setupMap = async () => {
-      if (!mapContainerRef.current || mapRef.current || !isVworldEnabled) {
+      if (!mapContainerRef.current || mapRef.current || !isMapRenderable) {
         return;
       }
 
@@ -136,8 +137,8 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
       const map = new maplibregl.Map({
         container: mapContainerRef.current,
-        style: createVworldStyle(env.vworldApiKey),
-        center: [127.0276, 37.4979],
+        style: createVworldStyle(mapPublicEnv.vworldApiKey),
+        center: MAP_DEFAULT_CENTER,
         zoom: 16,
         minZoom: 6,
         maxZoom: 19
@@ -192,7 +193,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
         const refreshWfs = async (selectedId: string | null = null, force = false) => {
           const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
-          if (currentZoom < 14) {
+          if (currentZoom < MAP_WFS_MIN_ZOOM) {
             lastBoundsKeyRef.current = "";
             setSourceData(createEmptyFeatureCollection());
             setWfsError(null);
@@ -234,7 +235,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
           debounceTimerRef.current = window.setTimeout(() => {
             void refreshWfs(null, false);
-          }, WFS_MOVEEND_DEBOUNCE_MS);
+          }, MAP_WFS_MOVEEND_DEBOUNCE_MS);
         };
 
         map.on("moveend", scheduleRefreshWfs);
@@ -291,10 +292,16 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     );
   }, [isMapReady, styleType]);
 
-  if (!isVworldEnabled) {
+  if (!isMapRenderable) {
+    const errorMessage = getPublicMapEnvErrorMessage();
     return (
       <div className="flex h-full w-full items-center justify-center bg-slate-100 p-8 text-center text-sm text-slate-600">
-        NEXT_PUBLIC_VWORLD_API_KEY 값이 없어 지도를 표시할 수 없습니다.
+        <div>
+          <p>{errorMessage ?? "지도 환경변수 설정이 필요합니다."}</p>
+          {missingPublicMapEnvKeys.length > 0 ? (
+            <p className="mt-2 text-xs text-slate-500">Missing: {missingPublicMapEnvKeys.map((x) => x.key).join(", ")}</p>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -352,9 +359,9 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         </div>
       ) : null}
 
-      {env.vworldReferrer ? (
+      {mapPublicEnv.vworldReferrer ? (
         <p className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-white/80 px-2 py-1 text-[10px] text-slate-500 backdrop-blur">
-          Referrer: {env.vworldReferrer}
+          Referrer: {mapPublicEnv.vworldReferrer}
         </p>
       ) : null}
     </div>

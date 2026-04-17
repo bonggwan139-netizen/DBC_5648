@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  VWORLD_WFS_DEFAULT_MAX_FEATURES,
+  VWORLD_WFS_MAX_FEATURES_LIMIT,
+  VWORLD_WFS_TYPENAME
+} from "@/components/service/map/config/constants";
+import { getMapServerEnv, getMissingMapServerEnvKeys } from "@/components/service/map/config/serverEnv";
 
 const VWORLD_WFS_URL = "https://api.vworld.kr/req/wfs";
-const MAX_FEATURES_LIMIT = 1000;
 
 function parseBbox(raw: string | null) {
   if (!raw) {
@@ -36,10 +41,14 @@ function extractServiceException(body: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const apiKey = process.env.VWORLD_API_KEY;
-  if (!apiKey) {
+  const mapServerEnv = getMapServerEnv();
+  const missingServerKeys = getMissingMapServerEnvKeys(mapServerEnv);
+  if (missingServerKeys.length > 0) {
     return NextResponse.json(
-      { error: "VWORLD_API_KEY_NOT_CONFIGURED", message: "서버에 VWORLD_API_KEY가 설정되지 않았습니다." },
+      {
+        error: "VWORLD_SERVER_ENV_NOT_CONFIGURED",
+        message: `서버 환경변수가 누락되었습니다: ${missingServerKeys.join(", ")}`
+      },
       { status: 500 }
     );
   }
@@ -52,13 +61,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const requestedMax = Number(req.nextUrl.searchParams.get("maxFeatures") ?? "500");
+  const requestedMax = Number(req.nextUrl.searchParams.get("maxFeatures") ?? String(VWORLD_WFS_DEFAULT_MAX_FEATURES));
   const maxFeatures = Number.isFinite(requestedMax)
-    ? String(Math.min(MAX_FEATURES_LIMIT, Math.max(1, Math.floor(requestedMax))))
-    : "500";
+    ? String(Math.min(VWORLD_WFS_MAX_FEATURES_LIMIT, Math.max(1, Math.floor(requestedMax))))
+    : String(VWORLD_WFS_DEFAULT_MAX_FEATURES);
 
-  const domain = process.env.VWORLD_DOMAIN || getRuntimeHost(req);
-  const typename = req.nextUrl.searchParams.get("typename") || "lp_pa_cbnd_bubun";
+  const domain = mapServerEnv.vworldDomain || getRuntimeHost(req);
+  const typename = req.nextUrl.searchParams.get("typename") || VWORLD_WFS_TYPENAME;
 
   const upstreamParams = new URLSearchParams({
     SERVICE: "WFS",
@@ -69,7 +78,7 @@ export async function GET(req: NextRequest) {
     OUTPUT: "json",
     MAXFEATURES: maxFeatures,
     BBOX: bbox,
-    KEY: apiKey,
+    KEY: mapServerEnv.vworldApiKey,
     DOMAIN: domain
   });
 
