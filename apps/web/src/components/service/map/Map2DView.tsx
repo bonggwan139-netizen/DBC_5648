@@ -35,6 +35,10 @@ function createEmptyFeatureCollection(): FeatureCollectionLike {
 
 function buildWfsUrl(map: MapLibreMap) {
   const bounds = map.getBounds();
+  const runtimeDomain =
+    typeof window !== "undefined" && window.location.hostname.length > 0
+      ? window.location.hostname
+      : env.vworldDomain;
   const params = new URLSearchParams({
     SERVICE: "WFS",
     REQUEST: "GetFeature",
@@ -43,12 +47,37 @@ function buildWfsUrl(map: MapLibreMap) {
     SRSNAME: "EPSG:4326",
     OUTPUT: "json",
     MAXFEATURES: "1200",
-    BBOX: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`,
+    BBOX: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()},EPSG:4326`,
     KEY: env.vworldApiKey,
-    DOMAIN: env.vworldDomain
+    DOMAIN: runtimeDomain
   });
 
   return `https://api.vworld.kr/req/wfs?${params.toString()}`;
+}
+
+async function fetchWfsFeatureCollection(map: MapLibreMap): Promise<FeatureCollectionLike> {
+  const res = await fetch(buildWfsUrl(map));
+  if (!res.ok) {
+    throw new Error(`WFS request failed: ${res.status}`);
+  }
+
+  const json = await res.json();
+  const fc = toFeatureCollection(json);
+
+  return {
+    ...fc,
+    features: fc.features.map((feature) => {
+      const props = (feature.properties ?? {}) as ParcelProps;
+      return {
+        ...feature,
+        properties: {
+          ...props,
+          _parcel_id: pickParcelId(props),
+          _selected: false
+        }
+      };
+    })
+  };
 }
 
 function toFeatureCollection(data: unknown): FeatureCollectionLike {
@@ -162,25 +191,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           }
 
           try {
-            const res = await fetch(buildWfsUrl(map));
-            const json = await res.json();
-            const fc = toFeatureCollection(json);
-
-            const normalized: FeatureCollectionLike = {
-              ...fc,
-              features: fc.features.map((feature) => {
-                const props = (feature.properties ?? {}) as ParcelProps;
-                return {
-                  ...feature,
-                  properties: {
-                    ...props,
-                    _parcel_id: pickParcelId(props),
-                    _selected: false
-                  }
-                };
-              })
-            };
-
+            const normalized = await fetchWfsFeatureCollection(map);
             map.getSource(WFS_SOURCE_ID)?.setData(normalized);
           } catch {
             map.getSource(WFS_SOURCE_ID)?.setData(createEmptyFeatureCollection());
@@ -189,7 +200,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
         map.on("moveend", refreshWfs);
 
-        map.on("click", WFS_FILL_LAYER_ID, (event: unknown) => {
+        const handleParcelClick = (event: unknown) => {
           const e = event as {
             features?: Array<{ properties?: ParcelProps }>;
           };
@@ -209,10 +220,8 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
           const current = source as { setData: (data: FeatureCollectionLike) => void };
 
-          fetch(buildWfsUrl(map))
-            .then((r) => r.json())
-            .then((json) => {
-              const fc = toFeatureCollection(json);
+          fetchWfsFeatureCollection(map)
+            .then((fc) => {
               const marked: FeatureCollectionLike = {
                 ...fc,
                 features: fc.features.map((feature) => {
@@ -230,8 +239,13 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
               };
               current.setData(marked);
             })
-            .catch(() => {});
-        });
+            .catch(() => {
+              current.setData(createEmptyFeatureCollection());
+            });
+        };
+
+        map.on("click", WFS_FILL_LAYER_ID, handleParcelClick);
+        map.on("click", WFS_FILL_ACTIVE_LAYER_ID, handleParcelClick);
 
         refreshWfs();
         setIsMapReady(true);
