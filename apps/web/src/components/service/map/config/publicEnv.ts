@@ -72,7 +72,11 @@ export const mapRenderGuard = {
     : "현재 환경에서 지도 서비스가 비활성화되어 있습니다.",
   developerMessage:
     missingPublicMapEnvKeys.length > 0
-      ? `Missing required map env: ${missingPublicMapEnvKeys.join(", ")}`
+      ? [
+          `Missing required map env: ${missingPublicMapEnvKeys.join(", ")}`,
+          "NEXT_PUBLIC_* values are baked into the client at build time.",
+          "If you added env in Vercel after deployment, redeploy this commit."
+        ].join(" ")
       : mapPublicEnv.mapServiceEnabled
         ? null
         : "Map service is disabled by NEXT_PUBLIC_ENABLE_MAP_SERVICE=false."
@@ -98,6 +102,11 @@ export function logPublicMapEnvDiagnostics(scope: string) {
     canRender: mapRenderGuard.canRender,
     isEnabled: mapRenderGuard.isEnabled,
     missingRequiredKeys: mapRenderGuard.missingRequiredKeys,
+    remediation: [
+      "Check Vercel Environment Variables for the current scope (Production/Preview/Development).",
+      "Set NEXT_PUBLIC_VWORLD_API_KEY and trigger a new deployment.",
+      "Confirm the deployment URL you are testing matches the scope where env is set."
+    ],
     config: mapPublicEnvConfig.map((entry) => ({
       key: entry.key,
       required: entry.required,
