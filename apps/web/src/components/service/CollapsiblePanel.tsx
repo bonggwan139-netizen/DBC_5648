@@ -2,9 +2,20 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useZoneSelectionState } from "@/components/service/map/useZoneSelectionState";
 
 export function CollapsiblePanel() {
   const [collapsed, setCollapsed] = useState(false);
+  const {
+    statusLabel,
+    addMockStep,
+    undoLast,
+    clearAll,
+    confirmSelection,
+    canUndo,
+    canConfirm,
+    canCancel
+  } = useZoneSelectionState();
 
   return (
     <motion.aside
@@ -21,8 +32,59 @@ export function CollapsiblePanel() {
             </section>
 
             <section className="rounded-2xl border border-stroke bg-white p-4">
-              <p className="text-sm text-slate-500">Search Placeholder</p>
-              <div className="mt-3 h-10 rounded-xl border border-dashed border-slate-300 bg-slate-50" />
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-700">구역 선택</p>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={confirmSelection}
+                    disabled={!canConfirm}
+                    aria-label="Confirm"
+                    className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 text-[11px] text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={undoLast}
+                    disabled={!canUndo}
+                    aria-label="Undo"
+                    className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 text-[11px] text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    ↺
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearAll}
+                    disabled={!canCancel}
+                    aria-label="Cancel"
+                    className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 text-[11px] text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                <p className="text-xs text-slate-500">{statusLabel}</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => addMockStep("parcel")}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 transition hover:bg-slate-100"
+                  >
+                    + Parcel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addMockStep("draw")}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 transition hover:bg-slate-100"
+                  >
+                    + Draw
+                  </button>
+                </div>
+              </div>
             </section>
 
             <section className="flex flex-1 flex-col gap-3 rounded-2xl border border-stroke bg-white p-4">
