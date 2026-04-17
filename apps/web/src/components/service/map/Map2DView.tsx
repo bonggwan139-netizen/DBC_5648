@@ -10,14 +10,23 @@ type Map2DViewProps = {
   showStyleSelector: boolean;
 };
 
-type ParcelProps = Record<string, string | number | null>;
+type ParcelProps = Record<string, unknown>;
 
 const WFS_SOURCE_ID = "vworld-cadastral-wfs";
 const WFS_LINE_LAYER_ID = "vworld-cadastral-line";
 const WFS_FILL_LAYER_ID = "vworld-cadastral-fill";
 const WFS_FILL_ACTIVE_LAYER_ID = "vworld-cadastral-fill-active";
 
-function createEmptyFeatureCollection(): GeoJSON.FeatureCollection {
+type FeatureCollectionLike = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry: unknown;
+    properties: ParcelProps & { _parcel_id?: string | null; _selected?: boolean };
+  }>;
+};
+
+function createEmptyFeatureCollection(): FeatureCollectionLike {
   return {
     type: "FeatureCollection",
     features: []
@@ -42,14 +51,14 @@ function buildWfsUrl(map: MapLibreMap) {
   return `https://api.vworld.kr/req/wfs?${params.toString()}`;
 }
 
-function toFeatureCollection(data: unknown): GeoJSON.FeatureCollection {
+function toFeatureCollection(data: unknown): FeatureCollectionLike {
   if (
     data &&
     typeof data === "object" &&
     (data as { type?: string }).type === "FeatureCollection" &&
     Array.isArray((data as { features?: unknown[] }).features)
   ) {
-    return data as GeoJSON.FeatureCollection;
+    return data as FeatureCollectionLike;
   }
 
   return createEmptyFeatureCollection();
@@ -157,7 +166,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
             const json = await res.json();
             const fc = toFeatureCollection(json);
 
-            const normalized: GeoJSON.FeatureCollection = {
+            const normalized: FeatureCollectionLike = {
               ...fc,
               features: fc.features.map((feature) => {
                 const props = (feature.properties ?? {}) as ParcelProps;
@@ -198,13 +207,13 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
             return;
           }
 
-          const current = source as { setData: (data: GeoJSON.FeatureCollection) => void };
+          const current = source as { setData: (data: FeatureCollectionLike) => void };
 
           fetch(buildWfsUrl(map))
             .then((r) => r.json())
             .then((json) => {
               const fc = toFeatureCollection(json);
-              const marked: GeoJSON.FeatureCollection = {
+              const marked: FeatureCollectionLike = {
                 ...fc,
                 features: fc.features.map((feature) => {
                   const props = (feature.properties ?? {}) as ParcelProps;

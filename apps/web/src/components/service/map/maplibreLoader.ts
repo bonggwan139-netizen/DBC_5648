@@ -10,7 +10,7 @@ export type MapLibreMap = {
   };
   getSource: (id: string) =>
     | {
-        setData: (data: GeoJSON.FeatureCollection) => void;
+        setData: (data: { type: "FeatureCollection"; features: unknown[] }) => void;
       }
     | undefined;
   on: (...args: unknown[]) => void;
