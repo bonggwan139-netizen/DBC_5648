@@ -61,3 +61,11 @@ Map 관련 env/상수/서버 설정 진입점:
 - 빠른 진단:
   - 브라우저 콘솔 `[map-env-guard]` 로그 확인
   - 개발 환경에서 `/api/map/env-status` 호출 시 서버가 env를 보고 있는지 확인
+
+### 배포 후 지도 미표시 시 확인 순서
+1. 문제 URL이 Production인지 Preview인지 먼저 확인합니다.
+2. Vercel > Project > Settings > Environment Variables에서 해당 Scope에 `NEXT_PUBLIC_VWORLD_API_KEY`가 있는지 확인합니다.
+3. 같은 화면에서 `VWORLD_API_KEY`도 Scope별로 설정되어 있는지 확인합니다(지적 WFS용).
+4. env를 추가/수정했다면 기존 배포는 무효이므로 새 배포를 실행합니다.
+5. 새 배포 URL에서 `/portfolio/dbc-map` 접속 후 브라우저 콘솔의 `[map-env-guard]`에서 `missingRequiredKeys`가 비어 있는지 확인합니다.
+6. 필요 시 `/api/map/env-status` 응답에서 `serverHasPublicVworldKey`, `vercelEnv`, `vercelUrl` 값을 확인합니다.

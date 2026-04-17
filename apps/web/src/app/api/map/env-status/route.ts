@@ -5,7 +5,9 @@ export async function GET() {
     {
       serverHasPublicVworldKey: Boolean(process.env.NEXT_PUBLIC_VWORLD_API_KEY),
       serverHasWfsKey: Boolean(process.env.VWORLD_API_KEY),
-      nodeEnv: process.env.NODE_ENV ?? "unknown"
+      nodeEnv: process.env.NODE_ENV ?? "unknown",
+      vercelEnv: process.env.VERCEL_ENV ?? "unknown",
+      vercelUrl: process.env.VERCEL_URL ?? null
     },
     {
       status: 200,
