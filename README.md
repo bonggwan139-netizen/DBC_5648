@@ -30,13 +30,14 @@ Production: deploy on Vercel and use the generated `https://<project>.vercel.app
 Set these in Vercel (Production) or local `.env` if needed:
 
 ```bash
-NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_key
+NEXT_PUBLIC_VWORLD_API_KEY=your_public_vworld_key
 NEXT_PUBLIC_VWORLD_REFERRER=https://dbc-5648.vercel.app
 NEXT_PUBLIC_VWORLD_DOMAIN=dbc-5648.vercel.app
 NEXT_PUBLIC_VWORLD_3D_BOOTSTRAP_URL=https://map.vworld.kr/js/webglMapInit.js.do
 NEXT_PUBLIC_VWORLD_3D_VERSION=3.0
+VWORLD_API_KEY=your_server_only_vworld_key
+VWORLD_DOMAIN=dbc-5648.vercel.app
 ```
 
-> Keep database credentials (e.g. PostGIS password) as server-only env variables without `NEXT_PUBLIC_`.
-
-For this repository, a temporary fallback key/referrer is wired in `apps/web/src/config/env.ts`; set `NEXT_PUBLIC_VWORLD_API_KEY` in Vercel to override it per environment.
+`/portfolio/dbc-map` 지적도(WFS)는 브라우저에서 VWorld를 직접 호출하지 않고, 서버 프록시(`/api/vworld/wfs`)를 통해 호출됩니다.
+따라서 WFS 키는 `VWORLD_API_KEY`(server-only)로 설정해야 하며, 클라이언트 번들에는 포함되지 않습니다.
