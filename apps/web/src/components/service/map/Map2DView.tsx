@@ -36,9 +36,8 @@ function createEmptyFeatureCollection(): FeatureCollectionLike {
 function buildWfsUrl(map: MapLibreMap) {
   const bounds = map.getBounds();
   const runtimeDomain =
-    typeof window !== "undefined" && window.location.hostname.length > 0
-      ? window.location.hostname
-      : env.vworldDomain;
+    typeof window !== "undefined" && window.location.hostname.length > 0 ? window.location.hostname : "";
+  const vworldDomain = env.vworldDomain || runtimeDomain;
   const params = new URLSearchParams({
     SERVICE: "WFS",
     REQUEST: "GetFeature",
@@ -49,7 +48,7 @@ function buildWfsUrl(map: MapLibreMap) {
     MAXFEATURES: "1200",
     BBOX: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()},EPSG:4326`,
     KEY: env.vworldApiKey,
-    DOMAIN: runtimeDomain
+    DOMAIN: vworldDomain
   });
 
   return `https://api.vworld.kr/req/wfs?${params.toString()}`;
