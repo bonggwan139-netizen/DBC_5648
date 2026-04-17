@@ -2,7 +2,8 @@ import {
   VWORLD_3D_DEFAULT_BOOTSTRAP_URL,
   VWORLD_3D_DEFAULT_VERSION,
   VWORLD_DEFAULT_DOMAIN,
-  VWORLD_DEFAULT_REFERRER
+  VWORLD_DEFAULT_REFERRER,
+  VWORLD_PUBLIC_DEFAULT_API_KEY
 } from "./constants";
 
 export type MapPublicEnv = {
@@ -23,7 +24,7 @@ type PublicEnvKeyConfig = {
 
 export const mapPublicEnv: MapPublicEnv = {
   mapServiceEnabled: (process.env.NEXT_PUBLIC_ENABLE_MAP_SERVICE ?? "true") !== "false",
-  vworldApiKey: process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? "",
+  vworldApiKey: process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? VWORLD_PUBLIC_DEFAULT_API_KEY,
   vworldReferrer: process.env.NEXT_PUBLIC_VWORLD_REFERRER ?? VWORLD_DEFAULT_REFERRER,
   vworldDomain: process.env.NEXT_PUBLIC_VWORLD_DOMAIN ?? VWORLD_DEFAULT_DOMAIN,
   vworld3dBootstrapUrl: process.env.NEXT_PUBLIC_VWORLD_3D_BOOTSTRAP_URL ?? VWORLD_3D_DEFAULT_BOOTSTRAP_URL,
@@ -62,6 +63,7 @@ export const missingPublicMapEnvKeys = mapPublicEnvConfig
   .map((entry) => entry.key);
 
 export const isMapRenderable = mapPublicEnv.mapServiceEnabled && missingPublicMapEnvKeys.length === 0;
+export const isUsingFallbackPublicVworldKey = (process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? "").trim().length === 0;
 
 export const mapRenderGuard = {
   isEnabled: mapPublicEnv.mapServiceEnabled,
@@ -78,7 +80,9 @@ export const mapRenderGuard = {
           "If you added env in Vercel after deployment, redeploy this commit."
         ].join(" ")
       : mapPublicEnv.mapServiceEnabled
-        ? null
+        ? isUsingFallbackPublicVworldKey
+          ? "Using repository fallback VWorld public key. Set NEXT_PUBLIC_VWORLD_API_KEY in Vercel for environment-specific operation."
+          : null
         : "Map service is disabled by NEXT_PUBLIC_ENABLE_MAP_SERVICE=false."
 } as const;
 
@@ -89,7 +93,7 @@ export function getPublicMapEnvErrorMessage() {
 }
 
 export function logPublicMapEnvDiagnostics(scope: string) {
-  if (mapRenderGuard.canRender) {
+  if (mapRenderGuard.canRender && !isUsingFallbackPublicVworldKey) {
     return;
   }
   if (loggedScopes.has(scope)) {
@@ -101,6 +105,7 @@ export function logPublicMapEnvDiagnostics(scope: string) {
     scope,
     canRender: mapRenderGuard.canRender,
     isEnabled: mapRenderGuard.isEnabled,
+    usingFallbackPublicKey: isUsingFallbackPublicVworldKey,
     missingRequiredKeys: mapRenderGuard.missingRequiredKeys,
     remediation: [
       "Check Vercel Environment Variables for the current scope (Production/Preview/Development).",

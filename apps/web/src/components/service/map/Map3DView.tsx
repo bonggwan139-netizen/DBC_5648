@@ -14,8 +14,9 @@ function escapeHtml(value: string) {
 }
 
 export function Map3DView() {
+  logPublicMapEnvDiagnostics("Map3DView");
+
   if (!isMapRenderable) {
-    logPublicMapEnvDiagnostics("Map3DView");
     return <MapEnvGuardNotice mode="3d" />;
   }
 

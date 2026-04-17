@@ -43,6 +43,10 @@ VWORLD_DOMAIN=dbc-5648.vercel.app
 `/portfolio/dbc-map` 지적도(WFS)는 브라우저에서 VWorld를 직접 호출하지 않고, 서버 프록시(`/api/vworld/wfs`)를 통해 호출됩니다.
 따라서 WFS 키는 `VWORLD_API_KEY`(server-only)로 설정해야 하며, 클라이언트 번들에는 포함되지 않습니다.
 
+현재 레포에는 Vercel env를 GitHub에서 자동 주입하는 워크플로우가 없습니다.
+- 베이스맵 렌더링은 `NEXT_PUBLIC_VWORLD_API_KEY`가 없을 때 repository default public dev key로 동작합니다.
+- 운영에서는 키 분리/회전을 위해 `NEXT_PUBLIC_VWORLD_API_KEY`를 스코프별로 명시 설정하는 것을 권장합니다.
+
 Map 관련 env/상수/서버 설정 진입점:
 - `apps/web/src/components/service/map/config/publicEnv.ts`
 - `apps/web/src/components/service/map/config/serverEnv.ts`
