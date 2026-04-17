@@ -1,4 +1,4 @@
-import { VWORLD_DEFAULT_DOMAIN } from "./constants";
+import { VWORLD_DEFAULT_DOMAIN, VWORLD_PUBLIC_DEFAULT_API_KEY } from "./constants";
 
 export type MapServerEnv = {
   vworldApiKey: string;
@@ -7,16 +7,7 @@ export type MapServerEnv = {
 
 export function getMapServerEnv(): MapServerEnv {
   return {
-    vworldApiKey: process.env.VWORLD_API_KEY ?? "",
-    vworldDomain: process.env.VWORLD_DOMAIN ?? VWORLD_DEFAULT_DOMAIN
+    vworldApiKey: process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? process.env.VWORLD_API_KEY ?? VWORLD_PUBLIC_DEFAULT_API_KEY,
+    vworldDomain: process.env.NEXT_PUBLIC_VWORLD_DOMAIN ?? process.env.VWORLD_DOMAIN ?? VWORLD_DEFAULT_DOMAIN
   };
-}
-
-export function getMissingMapServerEnvKeys(env: MapServerEnv) {
-  const missing = [] as string[];
-  if (!env.vworldApiKey) {
-    missing.push("VWORLD_API_KEY");
-  }
-
-  return missing;
 }

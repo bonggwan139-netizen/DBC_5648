@@ -4,7 +4,7 @@ import {
   VWORLD_WFS_MAX_FEATURES_LIMIT,
   VWORLD_WFS_TYPENAME
 } from "@/components/service/map/config/constants";
-import { getMapServerEnv, getMissingMapServerEnvKeys } from "@/components/service/map/config/serverEnv";
+import { getMapServerEnv } from "@/components/service/map/config/serverEnv";
 
 const VWORLD_WFS_URL = "https://api.vworld.kr/req/wfs";
 
@@ -42,17 +42,6 @@ function extractServiceException(body: string) {
 
 export async function GET(req: NextRequest) {
   const mapServerEnv = getMapServerEnv();
-  const missingServerKeys = getMissingMapServerEnvKeys(mapServerEnv);
-  if (missingServerKeys.length > 0) {
-    return NextResponse.json(
-      {
-        error: "VWORLD_SERVER_ENV_NOT_CONFIGURED",
-        message: `서버 환경변수가 누락되었습니다: ${missingServerKeys.join(", ")}`
-      },
-      { status: 500 }
-    );
-  }
-
   const bbox = parseBbox(req.nextUrl.searchParams.get("bbox"));
   if (!bbox) {
     return NextResponse.json(

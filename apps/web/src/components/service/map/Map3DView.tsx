@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { isMapRenderable, logPublicMapEnvDiagnostics, mapPublicEnv } from "./config/publicEnv";
 import { MapEnvGuardNotice } from "./MapEnvGuardNotice";
 
@@ -14,7 +14,11 @@ function escapeHtml(value: string) {
 }
 
 export function Map3DView() {
-  logPublicMapEnvDiagnostics("Map3DView");
+  useEffect(() => {
+    if (!isMapRenderable) {
+      logPublicMapEnvDiagnostics("Map3DView");
+    }
+  }, []);
 
   if (!isMapRenderable) {
     return <MapEnvGuardNotice mode="3d" />;

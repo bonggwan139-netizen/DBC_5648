@@ -124,7 +124,9 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [wfsError, setWfsError] = useState<string | null>(null);
 
   useEffect(() => {
-    logPublicMapEnvDiagnostics("Map2DView");
+    if (!isMapRenderable) {
+      logPublicMapEnvDiagnostics("Map2DView");
+    }
   }, []);
 
   useEffect(() => {
