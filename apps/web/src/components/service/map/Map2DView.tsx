@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getPublicMapEnvErrorMessage, isMapRenderable, mapPublicEnv, missingPublicMapEnvKeys } from "./config/publicEnv";
+import { isMapRenderable, logPublicMapEnvDiagnostics, mapPublicEnv } from "./config/publicEnv";
 import { MAP_DEFAULT_CENTER, MAP_WFS_MIN_ZOOM, MAP_WFS_MOVEEND_DEBOUNCE_MS } from "./config/constants";
 import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
 import { createVworldStyle, ROAD_LAYER_ID, SATELLITE_LAYER_ID } from "./vworldStyle";
 import type { Base2DStyle } from "./types";
+import { MapEnvGuardNotice } from "./MapEnvGuardNotice";
 
 type Map2DViewProps = {
   showStyleSelector: boolean;
@@ -121,6 +122,12 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
   const [wfsError, setWfsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isMapRenderable) {
+      logPublicMapEnvDiagnostics("Map2DView");
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -293,17 +300,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   }, [isMapReady, styleType]);
 
   if (!isMapRenderable) {
-    const errorMessage = getPublicMapEnvErrorMessage();
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-slate-100 p-8 text-center text-sm text-slate-600">
-        <div>
-          <p>{errorMessage ?? "지도 환경변수 설정이 필요합니다."}</p>
-          {missingPublicMapEnvKeys.length > 0 ? (
-            <p className="mt-2 text-xs text-slate-500">Missing: {missingPublicMapEnvKeys.map((x) => x.key).join(", ")}</p>
-          ) : null}
-        </div>
-      </div>
-    );
+    return <MapEnvGuardNotice mode="2d" />;
   }
 
   return (

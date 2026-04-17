@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { getPublicMapEnvErrorMessage, isMapRenderable, mapPublicEnv, missingPublicMapEnvKeys } from "./config/publicEnv";
+import { isMapRenderable, logPublicMapEnvDiagnostics, mapPublicEnv } from "./config/publicEnv";
+import { MapEnvGuardNotice } from "./MapEnvGuardNotice";
 
 function escapeHtml(value: string) {
   return value
@@ -13,6 +14,11 @@ function escapeHtml(value: string) {
 }
 
 export function Map3DView() {
+  if (!isMapRenderable) {
+    logPublicMapEnvDiagnostics("Map3DView");
+    return <MapEnvGuardNotice mode="3d" />;
+  }
+
   const srcDoc = useMemo(() => {
     const params = new URLSearchParams({
       version: mapPublicEnv.vworld3dVersion,
@@ -117,20 +123,6 @@ export function Map3DView() {
   </body>
 </html>`;
   }, []);
-
-  if (!isMapRenderable) {
-    const errorMessage = getPublicMapEnvErrorMessage();
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-slate-100 p-8 text-center text-sm text-slate-600">
-        <div>
-          <p>{errorMessage ?? "3D 지도 환경변수 설정이 필요합니다."}</p>
-          {missingPublicMapEnvKeys.length > 0 ? (
-            <p className="mt-2 text-xs text-slate-500">Missing: {missingPublicMapEnvKeys.map((x) => x.key).join(", ")}</p>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative h-full w-full bg-slate-950">

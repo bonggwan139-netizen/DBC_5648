@@ -14,6 +14,13 @@ export type MapPublicEnv = {
   vworld3dVersion: string;
 };
 
+type PublicEnvKeyConfig = {
+  key: string;
+  required: boolean;
+  value: string | boolean;
+  purpose: string;
+};
+
 export const mapPublicEnv: MapPublicEnv = {
   mapServiceEnabled: (process.env.NEXT_PUBLIC_ENABLE_MAP_SERVICE ?? "true") !== "false",
   vworldApiKey: process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? "",
@@ -23,21 +30,81 @@ export const mapPublicEnv: MapPublicEnv = {
   vworld3dVersion: process.env.NEXT_PUBLIC_VWORLD_3D_VERSION ?? VWORLD_3D_DEFAULT_VERSION
 };
 
-export const missingPublicMapEnvKeys = [
+export const mapPublicEnvConfig: PublicEnvKeyConfig[] = [
+  {
+    key: "NEXT_PUBLIC_ENABLE_MAP_SERVICE",
+    required: false,
+    value: mapPublicEnv.mapServiceEnabled,
+    purpose: "지도 기능 활성/비활성 토글"
+  },
   {
     key: "NEXT_PUBLIC_VWORLD_API_KEY",
+    required: true,
     value: mapPublicEnv.vworldApiKey,
-    purpose: "2D/3D VWorld basemap rendering"
+    purpose: "2D/3D VWorld basemap 렌더링"
+  },
+  {
+    key: "NEXT_PUBLIC_VWORLD_REFERRER",
+    required: false,
+    value: mapPublicEnv.vworldReferrer,
+    purpose: "운영 referrer 메타/표시"
+  },
+  {
+    key: "NEXT_PUBLIC_VWORLD_DOMAIN",
+    required: false,
+    value: mapPublicEnv.vworldDomain,
+    purpose: "VWorld 도메인 파라미터 기본값"
   }
-].filter((entry) => entry.value.length === 0);
+];
+
+export const missingPublicMapEnvKeys = mapPublicEnvConfig
+  .filter((entry) => entry.required && String(entry.value).trim().length === 0)
+  .map((entry) => entry.key);
 
 export const isMapRenderable = mapPublicEnv.mapServiceEnabled && missingPublicMapEnvKeys.length === 0;
 
-export function getPublicMapEnvErrorMessage() {
-  if (missingPublicMapEnvKeys.length === 0) {
-    return mapPublicEnv.mapServiceEnabled ? null : "현재 환경에서 지도 서비스가 비활성화되어 있습니다.";
-  }
+export const mapRenderGuard = {
+  isEnabled: mapPublicEnv.mapServiceEnabled,
+  missingRequiredKeys: missingPublicMapEnvKeys,
+  canRender: isMapRenderable,
+  userMessage: mapPublicEnv.mapServiceEnabled
+    ? "지도를 준비하는 데 필요한 설정이 아직 적용되지 않았습니다. 잠시 후 다시 시도해 주세요."
+    : "현재 환경에서 지도 서비스가 비활성화되어 있습니다.",
+  developerMessage:
+    missingPublicMapEnvKeys.length > 0
+      ? `Missing required map env: ${missingPublicMapEnvKeys.join(", ")}`
+      : mapPublicEnv.mapServiceEnabled
+        ? null
+        : "Map service is disabled by NEXT_PUBLIC_ENABLE_MAP_SERVICE=false."
+} as const;
 
-  const missingKeys = missingPublicMapEnvKeys.map((entry) => entry.key).join(", ");
-  return `지도 초기화에 필요한 환경변수가 없습니다: ${missingKeys}`;
+const loggedScopes = new Set<string>();
+
+export function getPublicMapEnvErrorMessage() {
+  return mapRenderGuard.canRender ? null : mapRenderGuard.userMessage;
+}
+
+export function logPublicMapEnvDiagnostics(scope: string) {
+  if (mapRenderGuard.canRender) {
+    return;
+  }
+  if (loggedScopes.has(scope)) {
+    return;
+  }
+  loggedScopes.add(scope);
+
+  const detail = {
+    scope,
+    canRender: mapRenderGuard.canRender,
+    isEnabled: mapRenderGuard.isEnabled,
+    missingRequiredKeys: mapRenderGuard.missingRequiredKeys,
+    config: mapPublicEnvConfig.map((entry) => ({
+      key: entry.key,
+      required: entry.required,
+      hasValue: String(entry.value).trim().length > 0,
+      purpose: entry.purpose
+    }))
+  };
+
+  console.warn("[map-env-guard] Map rendering blocked.", detail);
 }

@@ -47,3 +47,5 @@ Map 관련 env/상수/서버 설정 진입점:
 - `apps/web/src/components/service/map/config/publicEnv.ts`
 - `apps/web/src/components/service/map/config/serverEnv.ts`
 - `apps/web/src/components/service/map/config/constants.ts`
+
+`NEXT_PUBLIC_VWORLD_API_KEY`가 비어 있으면 지도 렌더링 가드가 동작하며, 사용자에게는 일반 안내 문구가 표시되고 개발자 콘솔에는 누락 env 키가 출력됩니다.
