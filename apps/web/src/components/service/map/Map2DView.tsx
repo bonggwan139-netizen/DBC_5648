@@ -23,6 +23,7 @@ const WFS_SOURCE_ID = "vworld-cadastral-wfs";
 const WFS_LINE_LAYER_ID = "vworld-cadastral-line";
 const WFS_FILL_LAYER_ID = "vworld-cadastral-fill";
 const WFS_FILL_ACTIVE_LAYER_ID = "vworld-cadastral-fill-active";
+const WFS_MOVEEND_DEBOUNCE_MS = 300;
 
 type FeatureCollectionLike = {
   type: "FeatureCollection";
