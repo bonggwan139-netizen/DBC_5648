@@ -5,9 +5,24 @@ export type MapServerEnv = {
   vworldDomain: string;
 };
 
+function normalizeVworldDomain(domain: string) {
+  const trimmed = domain.trim();
+  if (!trimmed) {
+    return VWORLD_DEFAULT_DOMAIN;
+  }
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed.replace(/\/+$/, "");
+  }
+
+  return `https://${trimmed.replace(/\/+$/, "")}`;
+}
+
 export function getMapServerEnv(): MapServerEnv {
   return {
     vworldApiKey: process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? process.env.VWORLD_API_KEY ?? VWORLD_PUBLIC_DEFAULT_API_KEY,
-    vworldDomain: process.env.NEXT_PUBLIC_VWORLD_DOMAIN ?? process.env.VWORLD_DOMAIN ?? VWORLD_DEFAULT_DOMAIN
+    vworldDomain: normalizeVworldDomain(
+      process.env.NEXT_PUBLIC_VWORLD_DOMAIN ?? process.env.VWORLD_DOMAIN ?? VWORLD_DEFAULT_DOMAIN
+    )
   };
 }
