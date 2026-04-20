@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  MAP_DATA_BBOX_COORD_PRECISION,
+  MAP_DATA_MAX_BBOX_AREA,
+  MAP_DATA_MAX_BBOX_HEIGHT,
+  MAP_DATA_MAX_BBOX_WIDTH,
+  MAP_DATA_UPSTREAM_MAX_RETRIES,
+  MAP_DATA_UPSTREAM_RETRY_BACKOFF_MS,
+  MAP_DATA_UPSTREAM_TIMEOUT_MS,
   VWORLD_DATA_DEFAULT_SIZE,
   VWORLD_DATA_LAYER,
   VWORLD_DATA_MAX_SIZE_LIMIT
@@ -130,23 +137,107 @@ function parseBbox(raw: string | null) {
     return null;
   }
 
-  const values = raw.split(",").map((v) => Number(v.trim()));
-  if (values.length !== 4 || values.some((v) => Number.isNaN(v))) {
-    return null;
+  const directCode = (error as { code?: unknown }).code;
+  if (typeof directCode === "string" && directCode.length > 0) {
+    return directCode;
   }
 
-  const [minX, minY, maxX, maxY] = values;
-  if (minX >= maxX || minY >= maxY) {
-    return null;
+  const causeCode = (error as { cause?: { code?: unknown } }).cause?.code;
+  if (typeof causeCode === "string" && causeCode.length > 0) {
+    return causeCode;
   }
+
+  return null;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isRetriableFetchErrorCode(code: string | null) {
+  if (!code) {
+    return false;
+  }
+
+  const normalized = code.toUpperCase();
+  return RETRIABLE_FETCH_ERROR_CODES.has(normalized) || normalized.startsWith("UND_ERR_");
+}
+
+function roundCoord(value: number) {
+  return Number(value.toFixed(MAP_DATA_BBOX_COORD_PRECISION));
+}
+
+function parseBbox(raw: string | null): BboxParseResult {
+  if (!raw) {
+    return {
+      ok: false,
+      error: "INVALID_BBOX",
+      message: "bbox 파라미터는 minX,minY,maxX,maxY 형식이어야 합니다.",
+      status: 400
+    };
+  }
+
+  const values = raw.split(",").map((v) => Number(v.trim()));
+  if (values.length !== 4 || values.some((v) => Number.isNaN(v))) {
+    return {
+      ok: false,
+      error: "INVALID_BBOX",
+      message: "bbox 파라미터는 minX,minY,maxX,maxY 형식이어야 합니다.",
+      status: 400
+    };
+  }
+
+  const [rawMinX, rawMinY, rawMaxX, rawMaxY] = values;
+  const minX = roundCoord(rawMinX);
+  const minY = roundCoord(rawMinY);
+  const maxX = roundCoord(rawMaxX);
+  const maxY = roundCoord(rawMaxY);
+
+  if (minX >= maxX || minY >= maxY) {
+    return {
+      ok: false,
+      error: "INVALID_BBOX",
+      message: "bbox 파라미터는 minX,minY,maxX,maxY 형식이어야 합니다.",
+      status: 400
+    };
+  }
+
   if (minX < -180 || maxX > 180 || minY < -90 || maxY > 90) {
-    return null;
+    return {
+      ok: false,
+      error: "INVALID_BBOX",
+      message: "bbox 파라미터는 minX,minY,maxX,maxY 형식이어야 합니다.",
+      status: 400
+    };
   }
   if ((maxX - minX) * (maxY - minY) > MAX_BBOX_AREA) {
     return null;
   }
 
-  return `BOX(${minX},${minY},${maxX},${maxY})`;
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const area = width * height;
+
+  if (width > MAP_DATA_MAX_BBOX_WIDTH || height > MAP_DATA_MAX_BBOX_HEIGHT || area > MAP_DATA_MAX_BBOX_AREA) {
+    return {
+      ok: false,
+      error: "BBOX_TOO_LARGE",
+      message: getErrorMessageByCode("BBOX_TOO_LARGE"),
+      status: 422,
+      debug: {
+        width,
+        height,
+        area
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    geomFilter: `BOX(${minX},${minY},${maxX},${maxY})`
+  };
 }
 
 function toFeatureCollection(payload: unknown): FeatureCollectionLike {
@@ -209,11 +300,16 @@ function extractErrorMessage(payload: unknown) {
 
 export async function GET(req: NextRequest) {
   const mapServerEnv = getMapServerEnv();
-  const geomFilter = parseBbox(req.nextUrl.searchParams.get("bbox"));
-  if (!geomFilter) {
+  const bboxResult = parseBbox(req.nextUrl.searchParams.get("bbox"));
+  if (!bboxResult.ok) {
     return NextResponse.json(
-      { error: "INVALID_BBOX", message: "bbox 파라미터는 minX,minY,maxX,maxY 형식이어야 합니다." },
-      { status: 400 }
+      {
+        error: bboxResult.error,
+        errorCode: bboxResult.error,
+        message: bboxResult.message,
+        ...(shouldExposeDebugSnippet() && bboxResult.debug ? { debug: bboxResult.debug } : {})
+      },
+      { status: bboxResult.status }
     );
   }
 
@@ -229,7 +325,7 @@ export async function GET(req: NextRequest) {
     service: "data",
     request: "GetFeature",
     data: VWORLD_DATA_LAYER,
-    geomFilter,
+    geomFilter: bboxResult.geomFilter,
     size,
     format: "json",
     crs: "EPSG:4326",
