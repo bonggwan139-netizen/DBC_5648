@@ -45,6 +45,12 @@ type CadastralFetchMeta = {
   cappedBySize: boolean;
 };
 
+type BoundsRequestInfo = {
+  blockedReason: "bbox-invalid" | "bbox-too-large" | null;
+  bbox: string | null;
+  key: string;
+};
+
 function createEmptyFeatureCollection(): FeatureCollectionLike {
   return {
     type: "FeatureCollection",
