@@ -19,7 +19,7 @@ Desktop-first portfolio web skeleton built with Next.js App Router, TypeScript, 
 ```bash
 cd apps/web
 npm install
-npm run check:no-wfs
+npm run check:no-legacy-vworld
 npm run dev
 ```
 
@@ -34,11 +34,11 @@ Set these in Vercel (Production) or local `.env` if needed:
 NEXT_PUBLIC_ENABLE_MAP_SERVICE=true
 NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_key
 NEXT_PUBLIC_VWORLD_REFERRER=https://dbc-5648.vercel.app
-NEXT_PUBLIC_VWORLD_DOMAIN=dbc-5648.vercel.app
+NEXT_PUBLIC_VWORLD_DOMAIN=https://dbc-5648.vercel.app
 NEXT_PUBLIC_VWORLD_3D_BOOTSTRAP_URL=https://map.vworld.kr/js/webglMapInit.js.do
 NEXT_PUBLIC_VWORLD_3D_VERSION=3.0
 VWORLD_API_KEY=optional_alias_of_same_key
-VWORLD_DOMAIN=dbc-5648.vercel.app
+VWORLD_DOMAIN=https://dbc-5648.vercel.app
 ```
 
 `/portfolio/dbc-map` 지적도(연속지적도)는 브라우저에서 VWorld를 직접 호출하지 않고, 서버 프록시(`/api/vworld/data`)를 통해 호출됩니다.
@@ -61,6 +61,8 @@ Map 관련 env/상수/서버 설정 진입점:
 - 이 레포는 monorepo이며 지도 앱은 `apps/web`(Next.js)에서 빌드됩니다.
 - `NEXT_PUBLIC_*` 변수는 **클라이언트 번들 빌드 시점에 고정**됩니다.
 - 따라서 Vercel에서 `NEXT_PUBLIC_VWORLD_API_KEY`를 추가/수정했다면 **반드시 새 배포(redeploy)** 가 필요합니다.
+- `/api/vworld/data` 라우트는 VWorld 연동 지연/소켓 이슈를 줄이기 위해 `runtime=edge` + `preferredRegion=icn1` 실행을 기대합니다.
+- 런타임 region이 멀어지면 `FETCH_UND_ERR_SOCKET`, timeout, upstream HTML 502 빈도가 증가할 수 있습니다.
 - Vercel Environment Variable Scope를 확인하세요:
   - Production URL 확인 시 → Production scope에 값 필요
   - Preview URL 확인 시 → Preview scope에 값 필요
