@@ -19,7 +19,7 @@ Desktop-first portfolio web skeleton built with Next.js App Router, TypeScript, 
 ```bash
 cd apps/web
 npm install
-npm run check:no-wfs
+npm run check:no-legacy-vworld
 npm run dev
 ```
 
