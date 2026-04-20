@@ -3,9 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { isMapRenderable, logPublicMapEnvDiagnostics, mapPublicEnv } from "./config/publicEnv";
 import {
-  MAP_DEFAULT_CENTER,
+  MAP_DATA_BBOX_COORD_PRECISION,
+  MAP_DATA_BBOX_KEY_PRECISION,
+  MAP_DATA_MAX_BBOX_AREA,
+  MAP_DATA_MAX_BBOX_HEIGHT,
+  MAP_DATA_MAX_BBOX_WIDTH,
   MAP_DATA_MIN_ZOOM,
   MAP_DATA_MOVEEND_DEBOUNCE_MS,
+  MAP_DEFAULT_CENTER,
   VWORLD_DATA_DEFAULT_SIZE
 } from "./config/constants";
 import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
@@ -92,10 +97,52 @@ function createBoundsKey(map: MapLibreMap) {
     .join(",");
 }
 
-function buildProxyDataUrl(map: MapLibreMap) {
+function buildBoundsRequestInfo(map: MapLibreMap): BoundsRequestInfo {
   const bounds = map.getBounds();
+  const west = roundCoord(bounds.getWest(), MAP_DATA_BBOX_COORD_PRECISION);
+  const south = roundCoord(bounds.getSouth(), MAP_DATA_BBOX_COORD_PRECISION);
+  const east = roundCoord(bounds.getEast(), MAP_DATA_BBOX_COORD_PRECISION);
+  const north = roundCoord(bounds.getNorth(), MAP_DATA_BBOX_COORD_PRECISION);
+
+  const key = [west, south, east, north].map((value) => value.toFixed(MAP_DATA_BBOX_KEY_PRECISION)).join(",");
+
+  if (
+    !Number.isFinite(west) ||
+    !Number.isFinite(south) ||
+    !Number.isFinite(east) ||
+    !Number.isFinite(north) ||
+    west >= east ||
+    south >= north
+  ) {
+    return {
+      blockedReason: "bbox-invalid",
+      bbox: null,
+      key
+    };
+  }
+
+  const width = east - west;
+  const height = north - south;
+  const area = width * height;
+
+  if (width > MAP_DATA_MAX_BBOX_WIDTH || height > MAP_DATA_MAX_BBOX_HEIGHT || area > MAP_DATA_MAX_BBOX_AREA) {
+    return {
+      blockedReason: "bbox-too-large",
+      bbox: null,
+      key
+    };
+  }
+
+  return {
+    blockedReason: null,
+    bbox: `${west},${south},${east},${north}`,
+    key
+  };
+}
+
+function buildProxyDataUrl(bbox: string) {
   const params = new URLSearchParams({
-    bbox: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`,
+    bbox,
     size: String(VWORLD_DATA_DEFAULT_SIZE)
   });
 
@@ -112,14 +159,19 @@ async function fetchCadastralFeatureCollection(
     cache: "no-store"
   });
 
-  const payload = (await res.json().catch(() => null)) as
-    | FeatureCollectionLike
-    | { error?: string; message?: string }
-    | null;
+  const payload = (await res.json().catch(() => null)) as FeatureCollectionLike | DataApiErrorPayload | null;
 
   if (!res.ok) {
-    const message = payload && typeof payload === "object" && "message" in payload ? payload.message : undefined;
-    throw new Error(message || `Data API request failed: ${res.status}`);
+    const code =
+      payload && typeof payload === "object"
+        ? (payload.errorCode ?? payload.error)
+        : undefined;
+    const message =
+      payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+        ? payload.message
+        : `Data API request failed: ${res.status}`;
+
+    throw new DataApiRequestError(message, res.status, code);
   }
 
   const fc = toFeatureCollection(payload);
@@ -141,6 +193,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const pendingFetchRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
   const lastBoundsKeyRef = useRef<string>("");
+  const activeRequestIdRef = useRef(0);
 
   const [styleType, setStyleType] = useState<Base2DStyle>("road");
   const [isMapReady, setIsMapReady] = useState(false);
@@ -195,6 +248,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         const refreshCadastralData = async (selectedId: string | null = null, force = false) => {
           const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
           if (currentZoom < MAP_DATA_MIN_ZOOM) {
+            resetPendingRequest();
             lastBoundsKeyRef.current = "";
             setSourceData(createEmptyFeatureCollection());
             setDataApiError(null);
@@ -202,15 +256,35 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
             return;
           }
 
-          const boundsKey = createBoundsKey(map);
-          if (!force && boundsKey === lastBoundsKeyRef.current) {
+          const requestInfo = buildBoundsRequestInfo(map);
+          if (requestInfo.blockedReason === "bbox-too-large") {
+            resetPendingRequest();
+            lastBoundsKeyRef.current = requestInfo.key;
+            setSourceData(createEmptyFeatureCollection());
+            setDataApiError(null);
+            setDataApiNotice(BBOX_NOTICE_MESSAGE);
             return;
           }
 
-          lastBoundsKeyRef.current = boundsKey;
+          if (requestInfo.blockedReason === "bbox-invalid" || !requestInfo.bbox) {
+            resetPendingRequest();
+            lastBoundsKeyRef.current = "";
+            setSourceData(createEmptyFeatureCollection());
+            setDataApiError("현재 지도 범위를 해석하지 못했습니다.");
+            setDataApiNotice(null);
+            return;
+          }
+
+          if (!force && requestInfo.key === lastBoundsKeyRef.current) {
+            return;
+          }
+
+          lastBoundsKeyRef.current = requestInfo.key;
           pendingFetchRef.current?.abort();
           const controller = new AbortController();
           pendingFetchRef.current = controller;
+          const requestId = activeRequestIdRef.current + 1;
+          activeRequestIdRef.current = requestId;
 
           try {
             const { fc, meta } = await fetchCadastralFeatureCollection(map, controller.signal);
@@ -222,7 +296,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
             setDataApiError(null);
             setLastFetchMeta(meta);
           } catch (error) {
-            if (controller.signal.aborted) {
+            if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
               return;
             }
 
@@ -336,6 +410,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         <p className="font-semibold text-slate-700">지적 Data API</p>
         <p className="mt-1">선 중심 표시 (fill 미표시)</p>
         <p className="mt-1">줌 14 이상에서 표시/조회</p>
+        <p className="mt-1">화면 범위가 넓으면 요청을 생략</p>
         <p className="mt-1">클릭 시 속성 확인 가능</p>
         {lastFetchMeta?.cappedBySize ? (
           <p className="mt-1 text-[11px] text-amber-700">요청 size 상한에 도달해 일부 구간이 비어 보일 수 있습니다.</p>
