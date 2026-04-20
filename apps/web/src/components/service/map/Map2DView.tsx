@@ -96,6 +96,11 @@ function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: strin
   };
 }
 
+
+function roundCoord(value: number, precision: number) {
+  return Number(value.toFixed(precision));
+}
+
 function createBoundsKey(map: MapLibreMap) {
   const bounds = map.getBounds();
   return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
