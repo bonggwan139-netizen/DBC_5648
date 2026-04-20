@@ -17,37 +17,19 @@ import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
 import { createVworldStyle, ROAD_LAYER_ID, SATELLITE_LAYER_ID } from "./vworldStyle";
 import type { Base2DStyle } from "./types";
 import { MapEnvGuardNotice } from "./MapEnvGuardNotice";
+import {
+  addCadastralLayers,
+  CADASTRAL_HIT_LAYER_ID,
+  CADASTRAL_LINE_ACTIVE_LAYER_ID,
+  CADASTRAL_LINE_LAYER_ID,
+  CADASTRAL_SOURCE_ID
+} from "./cadastralLayerStyle";
 
 type Map2DViewProps = {
   showStyleSelector: boolean;
 };
 
 type ParcelProps = Record<string, unknown>;
-
-type DataApiErrorPayload = {
-  error?: string;
-  errorCode?: string;
-  message?: string;
-};
-
-class DataApiRequestError extends Error {
-  code?: string;
-  status: number;
-
-  constructor(message: string, status: number, code?: string) {
-    super(message);
-    this.name = "DataApiRequestError";
-    this.status = status;
-    this.code = code;
-  }
-}
-
-const CADASTRAL_SOURCE_ID = "vworld-cadastral-data";
-const CADASTRAL_LINE_LAYER_ID = "vworld-cadastral-line";
-const CADASTRAL_FILL_LAYER_ID = "vworld-cadastral-fill";
-const CADASTRAL_FILL_ACTIVE_LAYER_ID = "vworld-cadastral-fill-active";
-const ZOOM_NOTICE_MESSAGE = `지적도는 줌 ${MAP_DATA_MIN_ZOOM} 이상에서 조회됩니다.`;
-const BBOX_NOTICE_MESSAGE = "현재 화면 범위가 넓어 지적도 요청을 생략했습니다. 조금 더 확대해 주세요.";
 
 type FeatureCollectionLike = {
   type: "FeatureCollection";
@@ -58,17 +40,10 @@ type FeatureCollectionLike = {
   }>;
 };
 
-type BoundsRequestInfo =
-  | {
-      blockedReason: null;
-      bbox: string;
-      key: string;
-    }
-  | {
-      blockedReason: "bbox-too-large" | "bbox-invalid";
-      bbox: null;
-      key: string;
-    };
+type CadastralFetchMeta = {
+  featureCount: number;
+  cappedBySize: boolean;
+};
 
 function createEmptyFeatureCollection(): FeatureCollectionLike {
   return {
@@ -115,8 +90,11 @@ function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: strin
   };
 }
 
-function roundCoord(value: number, precision: number) {
-  return Number(value.toFixed(precision));
+function createBoundsKey(map: MapLibreMap) {
+  const bounds = map.getBounds();
+  return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
+    .map((v) => v.toFixed(4))
+    .join(",");
 }
 
 function buildBoundsRequestInfo(map: MapLibreMap): BoundsRequestInfo {
@@ -171,8 +149,11 @@ function buildProxyDataUrl(bbox: string) {
   return `/api/vworld/data?${params.toString()}`;
 }
 
-async function fetchCadastralFeatureCollection(bbox: string, signal?: AbortSignal): Promise<FeatureCollectionLike> {
-  const res = await fetch(buildProxyDataUrl(bbox), {
+async function fetchCadastralFeatureCollection(
+  map: MapLibreMap,
+  signal?: AbortSignal
+): Promise<{ fc: FeatureCollectionLike; meta: CadastralFetchMeta }> {
+  const res = await fetch(buildProxyDataUrl(map), {
     method: "GET",
     signal,
     cache: "no-store"
@@ -193,7 +174,17 @@ async function fetchCadastralFeatureCollection(bbox: string, signal?: AbortSigna
     throw new DataApiRequestError(message, res.status, code);
   }
 
-  return toFeatureCollection(payload);
+  const fc = toFeatureCollection(payload);
+  const featureCount = Number(res.headers.get("x-vworld-feature-count") ?? fc.features.length);
+  const cappedBySize = res.headers.get("x-vworld-feature-capped") === "true";
+
+  return {
+    fc,
+    meta: {
+      featureCount: Number.isFinite(featureCount) ? featureCount : fc.features.length,
+      cappedBySize
+    }
+  };
 }
 
 export function Map2DView({ showStyleSelector }: Map2DViewProps) {
@@ -208,7 +199,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
   const [dataApiError, setDataApiError] = useState<string | null>(null);
-  const [dataApiNotice, setDataApiNotice] = useState<string | null>(ZOOM_NOTICE_MESSAGE);
+  const [lastFetchMeta, setLastFetchMeta] = useState<CadastralFetchMeta | null>(null);
 
   useEffect(() => {
     if (!isMapRenderable) {
@@ -245,52 +236,13 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           type: "geojson",
           data: createEmptyFeatureCollection()
         });
-
-        map.addLayer({
-          id: CADASTRAL_FILL_LAYER_ID,
-          type: "fill",
-          source: CADASTRAL_SOURCE_ID,
-          minzoom: 14,
-          paint: {
-            "fill-color": "#1d4ed8",
-            "fill-opacity": 0.07
-          }
-        });
-
-        map.addLayer({
-          id: CADASTRAL_FILL_ACTIVE_LAYER_ID,
-          type: "fill",
-          source: CADASTRAL_SOURCE_ID,
-          minzoom: 14,
-          paint: {
-            "fill-color": "#2563eb",
-            "fill-opacity": 0.2
-          },
-          filter: ["==", ["get", "_selected"], true]
-        });
-
-        map.addLayer({
-          id: CADASTRAL_LINE_LAYER_ID,
-          type: "line",
-          source: CADASTRAL_SOURCE_ID,
-          minzoom: 14,
-          paint: {
-            "line-color": "#1d4ed8",
-            "line-width": 1.2
-          }
-        });
+        addCadastralLayers(map);
 
         const setSourceData = (data: FeatureCollectionLike) => {
           const source = map.getSource(CADASTRAL_SOURCE_ID) as
             | { setData?: (next: FeatureCollectionLike) => void }
             | undefined;
           source?.setData?.(data);
-        };
-
-        const resetPendingRequest = () => {
-          pendingFetchRef.current?.abort();
-          pendingFetchRef.current = null;
-          activeRequestIdRef.current += 1;
         };
 
         const refreshCadastralData = async (selectedId: string | null = null, force = false) => {
@@ -300,7 +252,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
             lastBoundsKeyRef.current = "";
             setSourceData(createEmptyFeatureCollection());
             setDataApiError(null);
-            setDataApiNotice(ZOOM_NOTICE_MESSAGE);
+            setLastFetchMeta(null);
             return;
           }
 
@@ -335,29 +287,22 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           activeRequestIdRef.current = requestId;
 
           try {
-            const fc = await fetchCadastralFeatureCollection(requestInfo.bbox, controller.signal);
-            if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
+            const { fc, meta } = await fetchCadastralFeatureCollection(map, controller.signal);
+            if (controller.signal.aborted) {
               return;
             }
 
             setSourceData(normalizeFeatureCollection(fc, selectedId));
             setDataApiError(null);
-            setDataApiNotice(null);
+            setLastFetchMeta(meta);
           } catch (error) {
             if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
               return;
             }
 
             setSourceData(createEmptyFeatureCollection());
-
-            if (error instanceof DataApiRequestError && error.code === "BBOX_TOO_LARGE") {
-              setDataApiError(null);
-              setDataApiNotice(BBOX_NOTICE_MESSAGE);
-              return;
-            }
-
-            setDataApiNotice(null);
             setDataApiError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
+            setLastFetchMeta(null);
           }
         };
 
@@ -388,8 +333,9 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           void refreshCadastralData(pickedId, true);
         };
 
-        map.on("click", CADASTRAL_FILL_LAYER_ID, handleParcelClick);
-        map.on("click", CADASTRAL_FILL_ACTIVE_LAYER_ID, handleParcelClick);
+        map.on("click", CADASTRAL_HIT_LAYER_ID, handleParcelClick);
+        map.on("click", CADASTRAL_LINE_LAYER_ID, handleParcelClick);
+        map.on("click", CADASTRAL_LINE_ACTIVE_LAYER_ID, handleParcelClick);
 
         void refreshCadastralData();
         setIsMapReady(true);
@@ -462,17 +408,14 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
       <div className="absolute right-6 top-5 z-10 rounded-xl border border-blue-100 bg-white/92 p-3 text-xs text-slate-600 shadow-sm backdrop-blur">
         <p className="font-semibold text-slate-700">지적 Data API</p>
+        <p className="mt-1">선 중심 표시 (fill 미표시)</p>
         <p className="mt-1">줌 14 이상에서 표시/조회</p>
         <p className="mt-1">화면 범위가 넓으면 요청을 생략</p>
         <p className="mt-1">클릭 시 속성 확인 가능</p>
+        {lastFetchMeta?.cappedBySize ? (
+          <p className="mt-1 text-[11px] text-amber-700">요청 size 상한에 도달해 일부 구간이 비어 보일 수 있습니다.</p>
+        ) : null}
       </div>
-
-      {dataApiNotice ? (
-        <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
-          <p className="font-semibold">지적도 조회 안내</p>
-          <p className="mt-1 break-words">{dataApiNotice}</p>
-        </div>
-      ) : null}
 
       {dataApiError ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-rose-200 bg-white/95 p-3 text-[11px] text-rose-700 shadow-sm backdrop-blur">

@@ -13,14 +13,18 @@ import {
 } from "@/components/service/map/config/constants";
 import { getMapServerEnv } from "@/components/service/map/config/serverEnv";
 
+// On Vercel, preferredRegion is honored with Edge runtime; keep this route in KR to reduce vworld socket/timeouts.
 export const runtime = "edge";
 export const preferredRegion = "icn1";
-export const dynamic = "force-dynamic";
 
 const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
 const KNOWN_VWORLD_ERROR_CODES = ["INCORRECT_KEY", "INVALID_KEY", "OVER_REQUEST_LIMIT", "SYSTEM_ERROR"] as const;
 type KnownVworldErrorCode = (typeof KNOWN_VWORLD_ERROR_CODES)[number];
 const UPSTREAM_BODY_SNIPPET_MAX = 320;
+const UPSTREAM_TIMEOUT_MS = 8000;
+const UPSTREAM_MAX_RETRIES = 1;
+const UPSTREAM_RETRY_BACKOFF_MS = 250;
+const MAX_BBOX_AREA = 0.35;
 const RETRIABLE_FETCH_ERROR_CODES = new Set([
   "UND_ERR_SOCKET",
   "UND_ERR_CONNECT_TIMEOUT",
@@ -40,23 +44,6 @@ type FeatureCollectionLike = {
     properties?: Record<string, unknown>;
   }>;
 };
-
-type BboxParseResult =
-  | {
-      ok: true;
-      geomFilter: string;
-    }
-  | {
-      ok: false;
-      error: "INVALID_BBOX" | "BBOX_TOO_LARGE";
-      message: string;
-      status: number;
-      debug?: {
-        width?: number;
-        height?: number;
-        area?: number;
-      };
-    };
 
 function detectKnownErrorCode(rawBody: string): KnownVworldErrorCode | null {
   const upperBody = rawBody.toUpperCase();
@@ -88,8 +75,6 @@ function getErrorMessageByCode(code: string) {
       return "브이월드 요청 한도를 초과했습니다.";
     case "SYSTEM_ERROR":
       return "브이월드 시스템 오류가 발생했습니다.";
-    case "BBOX_TOO_LARGE":
-      return "현재 화면 범위가 넓어 지적도 요청을 생략했습니다. 조금 더 확대해 주세요.";
     default:
       return "브이월드 Data API 응답 처리 중 오류가 발생했습니다.";
   }
@@ -116,6 +101,39 @@ function buildSafeUpstreamQueryForDebug(params: URLSearchParams) {
 
 function extractFetchErrorCode(error: unknown) {
   if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const directCode = (error as { code?: unknown }).code;
+  if (typeof directCode === "string" && directCode.length > 0) {
+    return directCode;
+  }
+
+  const causeCode = (error as { cause?: { code?: unknown } }).cause?.code;
+  if (typeof causeCode === "string" && causeCode.length > 0) {
+    return causeCode;
+  }
+
+  return null;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isRetriableFetchErrorCode(code: string | null) {
+  if (!code) {
+    return false;
+  }
+
+  const normalized = code.toUpperCase();
+  return RETRIABLE_FETCH_ERROR_CODES.has(normalized) || normalized.startsWith("UND_ERR_");
+}
+
+function parseBbox(raw: string | null) {
+  if (!raw) {
     return null;
   }
 
@@ -193,6 +211,9 @@ function parseBbox(raw: string | null): BboxParseResult {
       message: "bbox 파라미터는 minX,minY,maxX,maxY 형식이어야 합니다.",
       status: 400
     };
+  }
+  if ((maxX - minX) * (maxY - minY) > MAX_BBOX_AREA) {
+    return null;
   }
 
   const width = maxX - minX;
@@ -295,9 +316,10 @@ export async function GET(req: NextRequest) {
   const requestedSize = Number(
     req.nextUrl.searchParams.get("size") ?? req.nextUrl.searchParams.get("maxFeatures") ?? String(VWORLD_DATA_DEFAULT_SIZE)
   );
-  const size = Number.isFinite(requestedSize)
-    ? String(Math.min(VWORLD_DATA_MAX_SIZE_LIMIT, Math.max(1, Math.floor(requestedSize))))
-    : String(VWORLD_DATA_DEFAULT_SIZE);
+  const safeSize = Number.isFinite(requestedSize)
+    ? Math.min(VWORLD_DATA_MAX_SIZE_LIMIT, Math.max(1, Math.floor(requestedSize)))
+    : VWORLD_DATA_DEFAULT_SIZE;
+  const size = String(safeSize);
 
   const params = new URLSearchParams({
     service: "data",
@@ -315,9 +337,9 @@ export async function GET(req: NextRequest) {
   let upstreamResponse: Response | null = null;
   let lastFetchErrorCode: string | null = null;
 
-  for (let attempt = 0; attempt <= MAP_DATA_UPSTREAM_MAX_RETRIES; attempt += 1) {
+  for (let attempt = 0; attempt <= UPSTREAM_MAX_RETRIES; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), MAP_DATA_UPSTREAM_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
     try {
       const response = await fetch(`${VWORLD_DATA_URL}?${params.toString()}`, {
@@ -327,8 +349,8 @@ export async function GET(req: NextRequest) {
       });
       clearTimeout(timeout);
 
-      if (response.status >= 500 && attempt < MAP_DATA_UPSTREAM_MAX_RETRIES) {
-        await delay(MAP_DATA_UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1));
+      if (response.status >= 500 && attempt < UPSTREAM_MAX_RETRIES) {
+        await delay(UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1));
         continue;
       }
 
@@ -339,8 +361,8 @@ export async function GET(req: NextRequest) {
       const fetchErrorCode = extractFetchErrorCode(error) ?? ((error as { name?: string })?.name ?? null);
       lastFetchErrorCode = fetchErrorCode;
 
-      if (attempt < MAP_DATA_UPSTREAM_MAX_RETRIES && isRetriableFetchErrorCode(fetchErrorCode)) {
-        await delay(MAP_DATA_UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1));
+      if (attempt < UPSTREAM_MAX_RETRIES && isRetriableFetchErrorCode(fetchErrorCode)) {
+        await delay(UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1));
         continue;
       }
 
@@ -377,7 +399,7 @@ export async function GET(req: NextRequest) {
               debug: {
                 upstreamPath: "/req/data",
                 upstreamQuery: safeUpstreamQueryForDebug,
-                retryCount: MAP_DATA_UPSTREAM_MAX_RETRIES
+                retryCount: UPSTREAM_MAX_RETRIES
               }
             }
           : {})
@@ -486,10 +508,17 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  return NextResponse.json(toFeatureCollection(payload), {
+  const normalized = toFeatureCollection(payload);
+  const featureCount = normalized.features.length;
+  const cappedBySize = featureCount >= safeSize;
+
+  return NextResponse.json(normalized, {
     status: 200,
     headers: {
-      "Cache-Control": "no-store"
+      "Cache-Control": "no-store",
+      "X-VWorld-Feature-Count": String(featureCount),
+      "X-VWorld-Requested-Size": String(safeSize),
+      "X-VWorld-Feature-Capped": cappedBySize ? "true" : "false"
     }
   });
 }
