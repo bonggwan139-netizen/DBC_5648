@@ -6,6 +6,10 @@ import {
 } from "@/components/service/map/config/constants";
 import { getMapServerEnv } from "@/components/service/map/config/serverEnv";
 
+export const runtime = "nodejs";
+// VWorld upstream is latency/route sensitive from distant regions, so pin this route near KR users/upstream.
+export const preferredRegion = "icn1";
+
 const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
 const KNOWN_VWORLD_ERROR_CODES = ["INCORRECT_KEY", "INVALID_KEY", "OVER_REQUEST_LIMIT", "SYSTEM_ERROR"] as const;
 type KnownVworldErrorCode = (typeof KNOWN_VWORLD_ERROR_CODES)[number];
