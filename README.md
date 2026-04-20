@@ -40,12 +40,12 @@ VWORLD_API_KEY=optional_alias_of_same_key
 VWORLD_DOMAIN=dbc-5648.vercel.app
 ```
 
-`/portfolio/dbc-map` 지적도(WFS)는 브라우저에서 VWorld를 직접 호출하지 않고, 서버 프록시(`/api/vworld/wfs`)를 통해 호출됩니다.
-키는 map config에서 단일 흐름으로 관리하며, 기본적으로 `NEXT_PUBLIC_VWORLD_API_KEY`를 기준으로 2D/3D와 WFS 프록시가 함께 사용합니다.
+`/portfolio/dbc-map` 지적도(연속지적도)는 브라우저에서 VWorld를 직접 호출하지 않고, 서버 프록시(`/api/vworld/data`)를 통해 호출됩니다.
+키는 map config에서 단일 흐름으로 관리하며, 기본적으로 `NEXT_PUBLIC_VWORLD_API_KEY`를 기준으로 2D/3D와 Data API 프록시가 함께 사용합니다.
 (`VWORLD_API_KEY`는 서버 측 별칭으로만 선택 사용)
 
 현재 레포에는 Vercel env를 GitHub에서 자동 주입하는 워크플로우가 없습니다.
-- 베이스맵/WFS는 `NEXT_PUBLIC_VWORLD_API_KEY`를 기준으로 동작합니다.
+- 베이스맵/지적 Data API는 `NEXT_PUBLIC_VWORLD_API_KEY`를 기준으로 동작합니다.
 - `NEXT_PUBLIC_VWORLD_API_KEY`가 없을 때 repository default public dev key로 동작합니다.
 - 운영에서는 키 회전을 위해 `NEXT_PUBLIC_VWORLD_API_KEY`를 스코프별로 명시 설정하는 것을 권장합니다.
 

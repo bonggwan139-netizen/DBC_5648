@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { isMapRenderable, logPublicMapEnvDiagnostics, mapPublicEnv } from "./config/publicEnv";
 import {
   MAP_DEFAULT_CENTER,
-  MAP_WFS_MIN_ZOOM,
-  MAP_WFS_MOVEEND_DEBOUNCE_MS,
-  VWORLD_WFS_DEFAULT_MAX_FEATURES
+  MAP_DATA_MIN_ZOOM,
+  MAP_DATA_MOVEEND_DEBOUNCE_MS,
+  VWORLD_DATA_DEFAULT_SIZE
 } from "./config/constants";
 import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
 import { createVworldStyle, ROAD_LAYER_ID, SATELLITE_LAYER_ID } from "./vworldStyle";
@@ -86,18 +86,18 @@ function createBoundsKey(map: MapLibreMap) {
     .join(",");
 }
 
-function buildProxyWfsUrl(map: MapLibreMap) {
+function buildProxyDataUrl(map: MapLibreMap) {
   const bounds = map.getBounds();
   const params = new URLSearchParams({
     bbox: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`,
-    maxFeatures: String(VWORLD_WFS_DEFAULT_MAX_FEATURES)
+    size: String(VWORLD_DATA_DEFAULT_SIZE)
   });
 
-  return `/api/vworld/wfs?${params.toString()}`;
+  return `/api/vworld/data?${params.toString()}`;
 }
 
-async function fetchWfsFeatureCollection(map: MapLibreMap, signal?: AbortSignal): Promise<FeatureCollectionLike> {
-  const res = await fetch(buildProxyWfsUrl(map), {
+async function fetchCadastralFeatureCollection(map: MapLibreMap, signal?: AbortSignal): Promise<FeatureCollectionLike> {
+  const res = await fetch(buildProxyDataUrl(map), {
     method: "GET",
     signal,
     cache: "no-store"
@@ -110,7 +110,7 @@ async function fetchWfsFeatureCollection(map: MapLibreMap, signal?: AbortSignal)
 
   if (!res.ok) {
     const message = payload && typeof payload === "object" && "message" in payload ? payload.message : undefined;
-    throw new Error(message || `WFS request failed: ${res.status}`);
+    throw new Error(message || `Data API request failed: ${res.status}`);
   }
 
   return toFeatureCollection(payload);
@@ -205,7 +205,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
         const refreshWfs = async (selectedId: string | null = null, force = false) => {
           const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
-          if (currentZoom < MAP_WFS_MIN_ZOOM) {
+          if (currentZoom < MAP_DATA_MIN_ZOOM) {
             lastBoundsKeyRef.current = "";
             setSourceData(createEmptyFeatureCollection());
             setWfsError(null);
@@ -223,7 +223,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           pendingFetchRef.current = controller;
 
           try {
-            const fc = await fetchWfsFeatureCollection(map, controller.signal);
+            const fc = await fetchCadastralFeatureCollection(map, controller.signal);
             if (controller.signal.aborted) {
               return;
             }
@@ -247,7 +247,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
           debounceTimerRef.current = window.setTimeout(() => {
             void refreshWfs(null, false);
-          }, MAP_WFS_MOVEEND_DEBOUNCE_MS);
+          }, MAP_DATA_MOVEEND_DEBOUNCE_MS);
         };
 
         map.on("moveend", scheduleRefreshWfs);
@@ -340,7 +340,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       ) : null}
 
       <div className="absolute right-6 top-5 z-10 rounded-xl border border-blue-100 bg-white/92 p-3 text-xs text-slate-600 shadow-sm backdrop-blur">
-        <p className="font-semibold text-slate-700">지적 WFS</p>
+        <p className="font-semibold text-slate-700">지적 Data API</p>
         <p className="mt-1">줌 14 이상에서 표시/조회</p>
         <p className="mt-1">클릭 시 속성 확인 가능</p>
       </div>
