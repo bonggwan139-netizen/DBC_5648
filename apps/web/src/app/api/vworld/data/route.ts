@@ -9,6 +9,7 @@ import { getMapServerEnv } from "@/components/service/map/config/serverEnv";
 const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
 const KNOWN_VWORLD_ERROR_CODES = ["INCORRECT_KEY", "INVALID_KEY", "OVER_REQUEST_LIMIT", "SYSTEM_ERROR"] as const;
 type KnownVworldErrorCode = (typeof KNOWN_VWORLD_ERROR_CODES)[number];
+const UPSTREAM_BODY_SNIPPET_MAX = 320;
 
 type FeatureCollectionLike = {
   type: "FeatureCollection";
@@ -52,6 +53,43 @@ function getErrorMessageByCode(code: string) {
     default:
       return "브이월드 Data API 응답 처리 중 오류가 발생했습니다.";
   }
+}
+
+function shouldExposeDebugSnippet() {
+  return process.env.NODE_ENV !== "production";
+}
+
+function buildUpstreamBodySnippet(bodyText: string, apiKey: string) {
+  const compact = bodyText.replace(/\s+/g, " ").trim();
+  const redacted = compact.split(apiKey).join("[REDACTED_KEY]");
+  return redacted.slice(0, UPSTREAM_BODY_SNIPPET_MAX);
+}
+
+function buildSafeUpstreamQueryForDebug(params: URLSearchParams) {
+  const sanitized = new URLSearchParams(params);
+  const key = sanitized.get("key");
+  if (key) {
+    sanitized.set("key", `[REDACTED:${Math.min(key.length, 8)}]`);
+  }
+  return sanitized.toString();
+}
+
+function extractFetchErrorCode(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const directCode = (error as { code?: unknown }).code;
+  if (typeof directCode === "string" && directCode.length > 0) {
+    return directCode;
+  }
+
+  const causeCode = (error as { cause?: { code?: unknown } }).cause?.code;
+  if (typeof causeCode === "string" && causeCode.length > 0) {
+    return causeCode;
+  }
+
+  return null;
 }
 
 function parseBbox(raw: string | null) {
@@ -162,17 +200,30 @@ export async function GET(req: NextRequest) {
     domain: mapServerEnv.vworldDomain
   });
 
+  const safeUpstreamQueryForDebug = buildSafeUpstreamQueryForDebug(params);
   let upstreamResponse: Response;
   try {
     upstreamResponse = await fetch(`${VWORLD_DATA_URL}?${params.toString()}`, {
       method: "GET",
       cache: "no-store"
     });
-  } catch {
+  } catch (error) {
+    const fetchErrorCode = extractFetchErrorCode(error);
     return NextResponse.json(
       {
         error: "VWORLD_DATA_UPSTREAM_FETCH_FAILED",
-        message: "브이월드 Data API 상위 서버 연결에 실패했습니다."
+        message: "브이월드 Data API 상위 서버 연결에 실패했습니다.",
+        errorCode: fetchErrorCode
+          ? `FETCH_${fetchErrorCode.toUpperCase()}`
+          : "FETCH_CONNECTION_ERROR",
+        ...(shouldExposeDebugSnippet()
+          ? {
+              debug: {
+                upstreamPath: "/req/data",
+                upstreamQuery: safeUpstreamQueryForDebug
+              }
+            }
+          : {})
       },
       { status: 502 }
     );
@@ -189,9 +240,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         {
           error: knownErrorCode,
+          errorCode: knownErrorCode,
           message: getErrorMessageByCode(knownErrorCode),
           upstreamStatus: upstreamResponse.status,
-          upstreamContentType: contentType
+          upstreamContentType: contentType,
+          ...(shouldExposeDebugSnippet()
+            ? {
+                debug: {
+                  upstreamQuery: safeUpstreamQueryForDebug,
+                  upstreamBodySnippet: buildUpstreamBodySnippet(bodyText, mapServerEnv.vworldApiKey)
+                }
+              }
+            : {})
         },
         { status: mapErrorCodeToStatus(knownErrorCode, upstreamResponse.status || 502) }
       );
@@ -200,10 +260,19 @@ export async function GET(req: NextRequest) {
     if (!upstreamResponse.ok) {
       return NextResponse.json(
         {
-          error: "VWORLD_DATA_NON_JSON_ERROR",
+          error: "UNKNOWN_UPSTREAM_RESPONSE",
+          errorCode: "UNKNOWN_UPSTREAM_RESPONSE",
           message: "브이월드 Data API가 JSON이 아닌 오류 응답을 반환했습니다.",
           upstreamStatus: upstreamResponse.status,
-          upstreamContentType: contentType
+          upstreamContentType: contentType,
+          ...(shouldExposeDebugSnippet()
+            ? {
+                debug: {
+                  upstreamQuery: safeUpstreamQueryForDebug,
+                  upstreamBodySnippet: buildUpstreamBodySnippet(bodyText, mapServerEnv.vworldApiKey)
+                }
+              }
+            : {})
         },
         { status: upstreamResponse.status }
       );
@@ -212,9 +281,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         error: "INVALID_DATA_API_JSON",
+        errorCode: "INVALID_DATA_API_JSON",
         message: "브이월드 Data API 응답이 JSON 형식이 아닙니다.",
         upstreamStatus: upstreamResponse.status,
-        upstreamContentType: contentType
+        upstreamContentType: contentType,
+        ...(shouldExposeDebugSnippet()
+          ? {
+              debug: {
+                upstreamQuery: safeUpstreamQueryForDebug,
+                upstreamBodySnippet: buildUpstreamBodySnippet(bodyText, mapServerEnv.vworldApiKey)
+              }
+            }
+          : {})
       },
       { status: 502 }
     );
@@ -226,6 +304,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         error: resolvedCode,
+        errorCode: resolvedCode,
         message: getErrorMessageByCode(resolvedCode) || extracted.message,
         upstreamStatus: upstreamResponse.status,
         upstreamContentType: contentType
@@ -241,6 +320,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         error: resolvedCode,
+        errorCode: resolvedCode,
         message: getErrorMessageByCode(resolvedCode) || extracted.message,
         upstreamStatus: upstreamResponse.status,
         upstreamContentType: contentType
