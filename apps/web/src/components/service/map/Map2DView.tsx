@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { isMapRenderable, logPublicMapEnvDiagnostics, mapPublicEnv } from "./config/publicEnv";
-import { MAP_DEFAULT_CENTER, MAP_WFS_MIN_ZOOM, MAP_WFS_MOVEEND_DEBOUNCE_MS } from "./config/constants";
+import {
+  MAP_DEFAULT_CENTER,
+  MAP_WFS_MIN_ZOOM,
+  MAP_WFS_MOVEEND_DEBOUNCE_MS,
+  VWORLD_WFS_DEFAULT_MAX_FEATURES
+} from "./config/constants";
 import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
 import { createVworldStyle, ROAD_LAYER_ID, SATELLITE_LAYER_ID } from "./vworldStyle";
 import type { Base2DStyle } from "./types";
@@ -77,7 +82,7 @@ function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: strin
 function createBoundsKey(map: MapLibreMap) {
   const bounds = map.getBounds();
   return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
-    .map((v) => v.toFixed(6))
+    .map((v) => v.toFixed(5))
     .join(",");
 }
 
@@ -85,7 +90,7 @@ function buildProxyWfsUrl(map: MapLibreMap) {
   const bounds = map.getBounds();
   const params = new URLSearchParams({
     bbox: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`,
-    maxFeatures: "1000"
+    maxFeatures: String(VWORLD_WFS_DEFAULT_MAX_FEATURES)
   });
 
   return `/api/vworld/wfs?${params.toString()}`;

@@ -22,6 +22,9 @@ function parseBbox(raw: string | null) {
   if (minX >= maxX || minY >= maxY) {
     return null;
   }
+  if (minX < -180 || maxX > 180 || minY < -90 || maxY > 90) {
+    return null;
+  }
 
   return `${minX},${minY},${maxX},${maxY},EPSG:4326`;
 }
@@ -38,6 +41,20 @@ function extractServiceException(body: string) {
     code: codeMatch?.[1] ?? "VWORLD_WFS_ERROR",
     message: messageMatch?.[1]?.trim() ?? "브이월드 WFS 응답 처리 중 오류가 발생했습니다."
   };
+}
+
+function classifyServiceException(code: string) {
+  const normalized = code.toUpperCase();
+  if (normalized.includes("INVALID") || normalized.includes("PARAMETER")) {
+    return 400;
+  }
+  if (normalized.includes("AUTH") || normalized.includes("KEY") || normalized.includes("ACCESS")) {
+    return 403;
+  }
+  if (normalized.includes("LIMIT") || normalized.includes("TOO_MANY")) {
+    return 429;
+  }
+  return 502;
 }
 
 export async function GET(req: NextRequest) {
@@ -65,16 +82,28 @@ export async function GET(req: NextRequest) {
     TYPENAME: typename,
     SRSNAME: "EPSG:4326",
     OUTPUT: "json",
+    outputFormat: "application/json",
     MAXFEATURES: maxFeatures,
     BBOX: bbox,
     KEY: mapServerEnv.vworldApiKey,
     DOMAIN: domain
   });
 
-  const upstreamResponse = await fetch(`${VWORLD_WFS_URL}?${upstreamParams.toString()}`, {
-    method: "GET",
-    cache: "no-store"
-  });
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await fetch(`${VWORLD_WFS_URL}?${upstreamParams.toString()}`, {
+      method: "GET",
+      cache: "no-store"
+    });
+  } catch {
+    return NextResponse.json(
+      {
+        error: "VWORLD_UPSTREAM_FETCH_FAILED",
+        message: "브이월드 WFS 상위 서버 연결에 실패했습니다."
+      },
+      { status: 502 }
+    );
+  }
 
   const bodyText = await upstreamResponse.text();
   const isXmlResponse =
@@ -83,9 +112,14 @@ export async function GET(req: NextRequest) {
 
   if (!upstreamResponse.ok || isXmlResponse) {
     const parsed = extractServiceException(bodyText);
+    const status = upstreamResponse.ok ? classifyServiceException(parsed.code) : upstreamResponse.status;
     return NextResponse.json(
-      { error: parsed.code, message: parsed.message },
-      { status: upstreamResponse.ok ? 502 : upstreamResponse.status }
+      {
+        error: parsed.code,
+        message: parsed.message,
+        upstreamStatus: upstreamResponse.status
+      },
+      { status }
     );
   }
 
