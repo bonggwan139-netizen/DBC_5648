@@ -117,12 +117,6 @@ function extractFetchErrorCode(error: unknown) {
   return null;
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function isRetriableFetchErrorCode(code: string | null) {
   if (!code) {
     return false;
@@ -211,6 +205,9 @@ function parseBbox(raw: string | null): BboxParseResult {
       message: "bbox 파라미터는 minX,minY,maxX,maxY 형식이어야 합니다.",
       status: 400
     };
+  }
+  if ((maxX - minX) * (maxY - minY) > MAX_BBOX_AREA) {
+    return null;
   }
   if ((maxX - minX) * (maxY - minY) > MAX_BBOX_AREA) {
     return null;
@@ -350,7 +347,7 @@ export async function GET(req: NextRequest) {
       clearTimeout(timeout);
 
       if (response.status >= 500 && attempt < UPSTREAM_MAX_RETRIES) {
-        await delay(UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1));
+        await new Promise((resolve) => setTimeout(resolve, UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1)));
         continue;
       }
 
@@ -362,7 +359,7 @@ export async function GET(req: NextRequest) {
       lastFetchErrorCode = fetchErrorCode;
 
       if (attempt < UPSTREAM_MAX_RETRIES && isRetriableFetchErrorCode(fetchErrorCode)) {
-        await delay(UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1));
+        await new Promise((resolve) => setTimeout(resolve, UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1)));
         continue;
       }
 
