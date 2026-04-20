@@ -3,9 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { isMapRenderable, logPublicMapEnvDiagnostics, mapPublicEnv } from "./config/publicEnv";
 import {
-  MAP_DEFAULT_CENTER,
+  MAP_DATA_BBOX_COORD_PRECISION,
+  MAP_DATA_BBOX_KEY_PRECISION,
+  MAP_DATA_MAX_BBOX_AREA,
+  MAP_DATA_MAX_BBOX_HEIGHT,
+  MAP_DATA_MAX_BBOX_WIDTH,
   MAP_DATA_MIN_ZOOM,
   MAP_DATA_MOVEEND_DEBOUNCE_MS,
+  MAP_DEFAULT_CENTER,
   VWORLD_DATA_DEFAULT_SIZE
 } from "./config/constants";
 import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
@@ -19,10 +24,30 @@ type Map2DViewProps = {
 
 type ParcelProps = Record<string, unknown>;
 
+type DataApiErrorPayload = {
+  error?: string;
+  errorCode?: string;
+  message?: string;
+};
+
+class DataApiRequestError extends Error {
+  code?: string;
+  status: number;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "DataApiRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 const CADASTRAL_SOURCE_ID = "vworld-cadastral-data";
 const CADASTRAL_LINE_LAYER_ID = "vworld-cadastral-line";
 const CADASTRAL_FILL_LAYER_ID = "vworld-cadastral-fill";
 const CADASTRAL_FILL_ACTIVE_LAYER_ID = "vworld-cadastral-fill-active";
+const ZOOM_NOTICE_MESSAGE = `지적도는 줌 ${MAP_DATA_MIN_ZOOM} 이상에서 조회됩니다.`;
+const BBOX_NOTICE_MESSAGE = "현재 화면 범위가 넓어 지적도 요청을 생략했습니다. 조금 더 확대해 주세요.";
 
 type FeatureCollectionLike = {
   type: "FeatureCollection";
@@ -32,6 +57,18 @@ type FeatureCollectionLike = {
     properties: ParcelProps & { _parcel_id?: string | null; _selected?: boolean };
   }>;
 };
+
+type BoundsRequestInfo =
+  | {
+      blockedReason: null;
+      bbox: string;
+      key: string;
+    }
+  | {
+      blockedReason: "bbox-too-large" | "bbox-invalid";
+      bbox: null;
+      key: string;
+    };
 
 function createEmptyFeatureCollection(): FeatureCollectionLike {
   return {
@@ -78,38 +115,82 @@ function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: strin
   };
 }
 
-function createBoundsKey(map: MapLibreMap) {
-  const bounds = map.getBounds();
-  return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
-    .map((v) => v.toFixed(4))
-    .join(",");
+function roundCoord(value: number, precision: number) {
+  return Number(value.toFixed(precision));
 }
 
-function buildProxyDataUrl(map: MapLibreMap) {
+function buildBoundsRequestInfo(map: MapLibreMap): BoundsRequestInfo {
   const bounds = map.getBounds();
+  const west = roundCoord(bounds.getWest(), MAP_DATA_BBOX_COORD_PRECISION);
+  const south = roundCoord(bounds.getSouth(), MAP_DATA_BBOX_COORD_PRECISION);
+  const east = roundCoord(bounds.getEast(), MAP_DATA_BBOX_COORD_PRECISION);
+  const north = roundCoord(bounds.getNorth(), MAP_DATA_BBOX_COORD_PRECISION);
+
+  const key = [west, south, east, north].map((value) => value.toFixed(MAP_DATA_BBOX_KEY_PRECISION)).join(",");
+
+  if (
+    !Number.isFinite(west) ||
+    !Number.isFinite(south) ||
+    !Number.isFinite(east) ||
+    !Number.isFinite(north) ||
+    west >= east ||
+    south >= north
+  ) {
+    return {
+      blockedReason: "bbox-invalid",
+      bbox: null,
+      key
+    };
+  }
+
+  const width = east - west;
+  const height = north - south;
+  const area = width * height;
+
+  if (width > MAP_DATA_MAX_BBOX_WIDTH || height > MAP_DATA_MAX_BBOX_HEIGHT || area > MAP_DATA_MAX_BBOX_AREA) {
+    return {
+      blockedReason: "bbox-too-large",
+      bbox: null,
+      key
+    };
+  }
+
+  return {
+    blockedReason: null,
+    bbox: `${west},${south},${east},${north}`,
+    key
+  };
+}
+
+function buildProxyDataUrl(bbox: string) {
   const params = new URLSearchParams({
-    bbox: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`,
+    bbox,
     size: String(VWORLD_DATA_DEFAULT_SIZE)
   });
 
   return `/api/vworld/data?${params.toString()}`;
 }
 
-async function fetchCadastralFeatureCollection(map: MapLibreMap, signal?: AbortSignal): Promise<FeatureCollectionLike> {
-  const res = await fetch(buildProxyDataUrl(map), {
+async function fetchCadastralFeatureCollection(bbox: string, signal?: AbortSignal): Promise<FeatureCollectionLike> {
+  const res = await fetch(buildProxyDataUrl(bbox), {
     method: "GET",
     signal,
     cache: "no-store"
   });
 
-  const payload = (await res.json().catch(() => null)) as
-    | FeatureCollectionLike
-    | { error?: string; message?: string }
-    | null;
+  const payload = (await res.json().catch(() => null)) as FeatureCollectionLike | DataApiErrorPayload | null;
 
   if (!res.ok) {
-    const message = payload && typeof payload === "object" && "message" in payload ? payload.message : undefined;
-    throw new Error(message || `Data API request failed: ${res.status}`);
+    const code =
+      payload && typeof payload === "object"
+        ? (payload.errorCode ?? payload.error)
+        : undefined;
+    const message =
+      payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+        ? payload.message
+        : `Data API request failed: ${res.status}`;
+
+    throw new DataApiRequestError(message, res.status, code);
   }
 
   return toFeatureCollection(payload);
@@ -121,11 +202,13 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const pendingFetchRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
   const lastBoundsKeyRef = useRef<string>("");
+  const activeRequestIdRef = useRef(0);
 
   const [styleType, setStyleType] = useState<Base2DStyle>("road");
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
   const [dataApiError, setDataApiError] = useState<string | null>(null);
+  const [dataApiNotice, setDataApiNotice] = useState<string | null>(ZOOM_NOTICE_MESSAGE);
 
   useEffect(() => {
     if (!isMapRenderable) {
@@ -204,39 +287,76 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           source?.setData?.(data);
         };
 
+        const resetPendingRequest = () => {
+          pendingFetchRef.current?.abort();
+          pendingFetchRef.current = null;
+          activeRequestIdRef.current += 1;
+        };
+
         const refreshCadastralData = async (selectedId: string | null = null, force = false) => {
           const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
           if (currentZoom < MAP_DATA_MIN_ZOOM) {
+            resetPendingRequest();
             lastBoundsKeyRef.current = "";
             setSourceData(createEmptyFeatureCollection());
             setDataApiError(null);
+            setDataApiNotice(ZOOM_NOTICE_MESSAGE);
             return;
           }
 
-          const boundsKey = createBoundsKey(map);
-          if (!force && boundsKey === lastBoundsKeyRef.current) {
+          const requestInfo = buildBoundsRequestInfo(map);
+          if (requestInfo.blockedReason === "bbox-too-large") {
+            resetPendingRequest();
+            lastBoundsKeyRef.current = requestInfo.key;
+            setSourceData(createEmptyFeatureCollection());
+            setDataApiError(null);
+            setDataApiNotice(BBOX_NOTICE_MESSAGE);
             return;
           }
 
-          lastBoundsKeyRef.current = boundsKey;
+          if (requestInfo.blockedReason === "bbox-invalid" || !requestInfo.bbox) {
+            resetPendingRequest();
+            lastBoundsKeyRef.current = "";
+            setSourceData(createEmptyFeatureCollection());
+            setDataApiError("현재 지도 범위를 해석하지 못했습니다.");
+            setDataApiNotice(null);
+            return;
+          }
+
+          if (!force && requestInfo.key === lastBoundsKeyRef.current) {
+            return;
+          }
+
+          lastBoundsKeyRef.current = requestInfo.key;
           pendingFetchRef.current?.abort();
           const controller = new AbortController();
           pendingFetchRef.current = controller;
+          const requestId = activeRequestIdRef.current + 1;
+          activeRequestIdRef.current = requestId;
 
           try {
-            const fc = await fetchCadastralFeatureCollection(map, controller.signal);
-            if (controller.signal.aborted) {
+            const fc = await fetchCadastralFeatureCollection(requestInfo.bbox, controller.signal);
+            if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
               return;
             }
 
             setSourceData(normalizeFeatureCollection(fc, selectedId));
             setDataApiError(null);
+            setDataApiNotice(null);
           } catch (error) {
-            if (controller.signal.aborted) {
+            if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
               return;
             }
 
             setSourceData(createEmptyFeatureCollection());
+
+            if (error instanceof DataApiRequestError && error.code === "BBOX_TOO_LARGE") {
+              setDataApiError(null);
+              setDataApiNotice(BBOX_NOTICE_MESSAGE);
+              return;
+            }
+
+            setDataApiNotice(null);
             setDataApiError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
           }
         };
@@ -343,8 +463,16 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       <div className="absolute right-6 top-5 z-10 rounded-xl border border-blue-100 bg-white/92 p-3 text-xs text-slate-600 shadow-sm backdrop-blur">
         <p className="font-semibold text-slate-700">지적 Data API</p>
         <p className="mt-1">줌 14 이상에서 표시/조회</p>
+        <p className="mt-1">화면 범위가 넓으면 요청을 생략</p>
         <p className="mt-1">클릭 시 속성 확인 가능</p>
       </div>
+
+      {dataApiNotice ? (
+        <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
+          <p className="font-semibold">지적도 조회 안내</p>
+          <p className="mt-1 break-words">{dataApiNotice}</p>
+        </div>
+      ) : null}
 
       {dataApiError ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-rose-200 bg-white/95 p-3 text-[11px] text-rose-700 shadow-sm backdrop-blur">
