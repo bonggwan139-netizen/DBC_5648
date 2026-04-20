@@ -21,10 +21,6 @@ const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
 const KNOWN_VWORLD_ERROR_CODES = ["INCORRECT_KEY", "INVALID_KEY", "OVER_REQUEST_LIMIT", "SYSTEM_ERROR"] as const;
 type KnownVworldErrorCode = (typeof KNOWN_VWORLD_ERROR_CODES)[number];
 const UPSTREAM_BODY_SNIPPET_MAX = 320;
-const UPSTREAM_TIMEOUT_MS = 8000;
-const UPSTREAM_MAX_RETRIES = 1;
-const UPSTREAM_RETRY_BACKOFF_MS = 250;
-const MAX_BBOX_AREA = 0.35;
 const RETRIABLE_FETCH_ERROR_CODES = new Set([
   "UND_ERR_SOCKET",
   "UND_ERR_CONNECT_TIMEOUT",
@@ -44,6 +40,23 @@ type FeatureCollectionLike = {
     properties?: Record<string, unknown>;
   }>;
 };
+
+type BboxParseResult =
+  | {
+      ok: true;
+      geomFilter: string;
+    }
+  | {
+      ok: false;
+      error: string;
+      message: string;
+      status: number;
+      debug?: {
+        width: number;
+        height: number;
+        area: number;
+      };
+    };
 
 function detectKnownErrorCode(rawBody: string): KnownVworldErrorCode | null {
   const upperBody = rawBody.toUpperCase();
@@ -126,39 +139,6 @@ function isRetriableFetchErrorCode(code: string | null) {
   return RETRIABLE_FETCH_ERROR_CODES.has(normalized) || normalized.startsWith("UND_ERR_");
 }
 
-function parseBbox(raw: string | null) {
-  if (!raw) {
-    return null;
-  }
-
-  const directCode = (error as { code?: unknown }).code;
-  if (typeof directCode === "string" && directCode.length > 0) {
-    return directCode;
-  }
-
-  const causeCode = (error as { cause?: { code?: unknown } }).cause?.code;
-  if (typeof causeCode === "string" && causeCode.length > 0) {
-    return causeCode;
-  }
-
-  return null;
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-function isRetriableFetchErrorCode(code: string | null) {
-  if (!code) {
-    return false;
-  }
-
-  const normalized = code.toUpperCase();
-  return RETRIABLE_FETCH_ERROR_CODES.has(normalized) || normalized.startsWith("UND_ERR_");
-}
-
 function roundCoord(value: number) {
   return Number(value.toFixed(MAP_DATA_BBOX_COORD_PRECISION));
 }
@@ -206,13 +186,6 @@ function parseBbox(raw: string | null): BboxParseResult {
       status: 400
     };
   }
-  if ((maxX - minX) * (maxY - minY) > MAX_BBOX_AREA) {
-    return null;
-  }
-  if ((maxX - minX) * (maxY - minY) > MAX_BBOX_AREA) {
-    return null;
-  }
-
   const width = maxX - minX;
   const height = maxY - minY;
   const area = width * height;
@@ -334,9 +307,9 @@ export async function GET(req: NextRequest) {
   let upstreamResponse: Response | null = null;
   let lastFetchErrorCode: string | null = null;
 
-  for (let attempt = 0; attempt <= UPSTREAM_MAX_RETRIES; attempt += 1) {
+  for (let attempt = 0; attempt <= MAP_DATA_UPSTREAM_MAX_RETRIES; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), MAP_DATA_UPSTREAM_TIMEOUT_MS);
 
     try {
       const response = await fetch(`${VWORLD_DATA_URL}?${params.toString()}`, {
@@ -346,8 +319,8 @@ export async function GET(req: NextRequest) {
       });
       clearTimeout(timeout);
 
-      if (response.status >= 500 && attempt < UPSTREAM_MAX_RETRIES) {
-        await new Promise((resolve) => setTimeout(resolve, UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1)));
+      if (response.status >= 500 && attempt < MAP_DATA_UPSTREAM_MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, MAP_DATA_UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1)));
         continue;
       }
 
@@ -358,8 +331,8 @@ export async function GET(req: NextRequest) {
       const fetchErrorCode = extractFetchErrorCode(error) ?? ((error as { name?: string })?.name ?? null);
       lastFetchErrorCode = fetchErrorCode;
 
-      if (attempt < UPSTREAM_MAX_RETRIES && isRetriableFetchErrorCode(fetchErrorCode)) {
-        await new Promise((resolve) => setTimeout(resolve, UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1)));
+      if (attempt < MAP_DATA_UPSTREAM_MAX_RETRIES && isRetriableFetchErrorCode(fetchErrorCode)) {
+        await new Promise((resolve) => setTimeout(resolve, MAP_DATA_UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1)));
         continue;
       }
 
@@ -396,7 +369,7 @@ export async function GET(req: NextRequest) {
               debug: {
                 upstreamPath: "/req/data",
                 upstreamQuery: safeUpstreamQueryForDebug,
-                retryCount: UPSTREAM_MAX_RETRIES
+                retryCount: MAP_DATA_UPSTREAM_MAX_RETRIES
               }
             }
           : {})
