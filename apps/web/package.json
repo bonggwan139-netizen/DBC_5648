@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "check:no-wfs": "if rg -n \"api/vworld/wfs|req/wfs|SERVICE=WFS\" src; then echo \"Deprecated WFS references found\" && exit 1; else echo \"No deprecated WFS references\"; fi",
+    "check:no-wfs": "if rg -n \"api/vworld/wfs|VWORLD_WFS_|req/wfs|SERVICE=WFS\" src; then echo \"Deprecated WFS references found\" && exit 1; else echo \"No deprecated WFS references\"; fi",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

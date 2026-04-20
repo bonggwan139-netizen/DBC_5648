@@ -11,12 +11,3 @@ export const VWORLD_DATA_MAX_SIZE_LIMIT = 1000;
 export const VWORLD_DATA_DEFAULT_SIZE = 500;
 export const MAP_DATA_MIN_ZOOM = 14;
 export const MAP_DATA_MOVEEND_DEBOUNCE_MS = 450;
-
-/**
- * Backward-compatible aliases for older deployments that may still compile a
- * legacy cadastral route from a stale build cache or older branch.
- * Keep these aliases until all environments are fully switched to /api/vworld/data.
- */
-export const VWORLD_WFS_TYPENAME = VWORLD_DATA_LAYER;
-export const VWORLD_WFS_MAX_FEATURES_LIMIT = VWORLD_DATA_MAX_SIZE_LIMIT;
-export const VWORLD_WFS_DEFAULT_MAX_FEATURES = VWORLD_DATA_DEFAULT_SIZE;
