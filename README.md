@@ -61,7 +61,7 @@ Map 관련 env/상수/서버 설정 진입점:
 - 이 레포는 monorepo이며 지도 앱은 `apps/web`(Next.js)에서 빌드됩니다.
 - `NEXT_PUBLIC_*` 변수는 **클라이언트 번들 빌드 시점에 고정**됩니다.
 - 따라서 Vercel에서 `NEXT_PUBLIC_VWORLD_API_KEY`를 추가/수정했다면 **반드시 새 배포(redeploy)** 가 필요합니다.
-- `/api/vworld/data` 라우트는 VWorld 연동 지연/소켓 이슈를 줄이기 위해 `preferredRegion=icn1` 실행을 기대합니다.
+- `/api/vworld/data` 라우트는 VWorld 연동 지연/소켓 이슈를 줄이기 위해 `runtime=edge` + `preferredRegion=icn1` 실행을 기대합니다.
 - 런타임 region이 멀어지면 `FETCH_UND_ERR_SOCKET`, timeout, upstream HTML 502 빈도가 증가할 수 있습니다.
 - Vercel Environment Variable Scope를 확인하세요:
   - Production URL 확인 시 → Production scope에 값 필요

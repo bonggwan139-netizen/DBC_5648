@@ -6,8 +6,8 @@ import {
 } from "@/components/service/map/config/constants";
 import { getMapServerEnv } from "@/components/service/map/config/serverEnv";
 
-export const runtime = "nodejs";
-// VWorld upstream is latency/route sensitive from distant regions, so pin this route near KR users/upstream.
+// On Vercel, preferredRegion is honored with Edge runtime; keep this route in KR to reduce vworld socket/timeouts.
+export const runtime = "edge";
 export const preferredRegion = "icn1";
 
 const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
