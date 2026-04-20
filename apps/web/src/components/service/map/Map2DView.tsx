@@ -45,6 +45,12 @@ type CadastralFetchMeta = {
   cappedBySize: boolean;
 };
 
+type BoundsRequestInfo = {
+  blockedReason: "bbox-invalid" | "bbox-too-large" | null;
+  bbox: string | null;
+  key: string;
+};
+
 function createEmptyFeatureCollection(): FeatureCollectionLike {
   return {
     type: "FeatureCollection",
@@ -88,6 +94,11 @@ function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: strin
       };
     })
   };
+}
+
+
+function roundCoord(value: number, precision: number) {
+  return Number(value.toFixed(precision));
 }
 
 function createBoundsKey(map: MapLibreMap) {
