@@ -19,11 +19,10 @@ type Map2DViewProps = {
 
 type ParcelProps = Record<string, unknown>;
 
-const WFS_SOURCE_ID = "vworld-cadastral-wfs";
-const WFS_LINE_LAYER_ID = "vworld-cadastral-line";
-const WFS_FILL_LAYER_ID = "vworld-cadastral-fill";
-const WFS_FILL_ACTIVE_LAYER_ID = "vworld-cadastral-fill-active";
-const WFS_MOVEEND_DEBOUNCE_MS = 300;
+const CADASTRAL_SOURCE_ID = "vworld-cadastral-data";
+const CADASTRAL_LINE_LAYER_ID = "vworld-cadastral-line";
+const CADASTRAL_FILL_LAYER_ID = "vworld-cadastral-fill";
+const CADASTRAL_FILL_ACTIVE_LAYER_ID = "vworld-cadastral-fill-active";
 
 type FeatureCollectionLike = {
   type: "FeatureCollection";
@@ -126,7 +125,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [styleType, setStyleType] = useState<Base2DStyle>("road");
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
-  const [wfsError, setWfsError] = useState<string | null>(null);
+  const [dataApiError, setDataApiError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isMapRenderable) {
@@ -159,15 +158,15 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
 
       map.on("load", () => {
-        map.addSource(WFS_SOURCE_ID, {
+        map.addSource(CADASTRAL_SOURCE_ID, {
           type: "geojson",
           data: createEmptyFeatureCollection()
         });
 
         map.addLayer({
-          id: WFS_FILL_LAYER_ID,
+          id: CADASTRAL_FILL_LAYER_ID,
           type: "fill",
-          source: WFS_SOURCE_ID,
+          source: CADASTRAL_SOURCE_ID,
           minzoom: 14,
           paint: {
             "fill-color": "#1d4ed8",
@@ -176,9 +175,9 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         });
 
         map.addLayer({
-          id: WFS_FILL_ACTIVE_LAYER_ID,
+          id: CADASTRAL_FILL_ACTIVE_LAYER_ID,
           type: "fill",
-          source: WFS_SOURCE_ID,
+          source: CADASTRAL_SOURCE_ID,
           minzoom: 14,
           paint: {
             "fill-color": "#2563eb",
@@ -188,9 +187,9 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         });
 
         map.addLayer({
-          id: WFS_LINE_LAYER_ID,
+          id: CADASTRAL_LINE_LAYER_ID,
           type: "line",
-          source: WFS_SOURCE_ID,
+          source: CADASTRAL_SOURCE_ID,
           minzoom: 14,
           paint: {
             "line-color": "#1d4ed8",
@@ -199,16 +198,18 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         });
 
         const setSourceData = (data: FeatureCollectionLike) => {
-          const source = map.getSource(WFS_SOURCE_ID) as { setData?: (next: FeatureCollectionLike) => void } | undefined;
+          const source = map.getSource(CADASTRAL_SOURCE_ID) as
+            | { setData?: (next: FeatureCollectionLike) => void }
+            | undefined;
           source?.setData?.(data);
         };
 
-        const refreshWfs = async (selectedId: string | null = null, force = false) => {
+        const refreshCadastralData = async (selectedId: string | null = null, force = false) => {
           const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
           if (currentZoom < MAP_DATA_MIN_ZOOM) {
             lastBoundsKeyRef.current = "";
             setSourceData(createEmptyFeatureCollection());
-            setWfsError(null);
+            setDataApiError(null);
             return;
           }
 
@@ -229,28 +230,28 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
             }
 
             setSourceData(normalizeFeatureCollection(fc, selectedId));
-            setWfsError(null);
+            setDataApiError(null);
           } catch (error) {
             if (controller.signal.aborted) {
               return;
             }
 
             setSourceData(createEmptyFeatureCollection());
-            setWfsError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
+            setDataApiError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
           }
         };
 
-        const scheduleRefreshWfs = () => {
+        const scheduleRefreshCadastralData = () => {
           if (debounceTimerRef.current !== null) {
             window.clearTimeout(debounceTimerRef.current);
           }
 
           debounceTimerRef.current = window.setTimeout(() => {
-            void refreshWfs(null, false);
+            void refreshCadastralData(null, false);
           }, MAP_DATA_MOVEEND_DEBOUNCE_MS);
         };
 
-        map.on("moveend", scheduleRefreshWfs);
+        map.on("moveend", scheduleRefreshCadastralData);
 
         const handleParcelClick = (event: unknown) => {
           const e = event as {
@@ -264,13 +265,13 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           const picked = (e.features[0].properties ?? {}) as ParcelProps;
           const pickedId = pickParcelId(picked);
           setSelectedParcel(picked);
-          void refreshWfs(pickedId, true);
+          void refreshCadastralData(pickedId, true);
         };
 
-        map.on("click", WFS_FILL_LAYER_ID, handleParcelClick);
-        map.on("click", WFS_FILL_ACTIVE_LAYER_ID, handleParcelClick);
+        map.on("click", CADASTRAL_FILL_LAYER_ID, handleParcelClick);
+        map.on("click", CADASTRAL_FILL_ACTIVE_LAYER_ID, handleParcelClick);
 
-        void refreshWfs();
+        void refreshCadastralData();
         setIsMapReady(true);
       });
 
@@ -345,10 +346,10 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         <p className="mt-1">클릭 시 속성 확인 가능</p>
       </div>
 
-      {wfsError ? (
+      {dataApiError ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-rose-200 bg-white/95 p-3 text-[11px] text-rose-700 shadow-sm backdrop-blur">
           <p className="font-semibold">지적도 조회 오류</p>
-          <p className="mt-1 break-words">{wfsError}</p>
+          <p className="mt-1 break-words">{dataApiError}</p>
         </div>
       ) : null}
 
