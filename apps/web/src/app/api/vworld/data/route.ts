@@ -7,6 +7,9 @@ import {
 import { getMapServerEnv } from "@/components/service/map/config/serverEnv";
 
 const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
+const KNOWN_VWORLD_ERROR_CODES = ["INCORRECT_KEY", "INVALID_KEY", "OVER_REQUEST_LIMIT", "SYSTEM_ERROR"] as const;
+type KnownVworldErrorCode = (typeof KNOWN_VWORLD_ERROR_CODES)[number];
+
 type FeatureCollectionLike = {
   type: "FeatureCollection";
   features: Array<{
@@ -15,6 +18,41 @@ type FeatureCollectionLike = {
     properties?: Record<string, unknown>;
   }>;
 };
+
+function detectKnownErrorCode(rawBody: string): KnownVworldErrorCode | null {
+  const upperBody = rawBody.toUpperCase();
+  const matched = KNOWN_VWORLD_ERROR_CODES.find((code) => upperBody.includes(code));
+  return matched ?? null;
+}
+
+function mapErrorCodeToStatus(code: string, fallbackStatus = 502) {
+  switch (code.toUpperCase()) {
+    case "INCORRECT_KEY":
+    case "INVALID_KEY":
+      return 403;
+    case "OVER_REQUEST_LIMIT":
+      return 429;
+    case "SYSTEM_ERROR":
+      return 502;
+    default:
+      return fallbackStatus;
+  }
+}
+
+function getErrorMessageByCode(code: string) {
+  switch (code.toUpperCase()) {
+    case "INCORRECT_KEY":
+      return "브이월드 인증 도메인 정보가 일치하지 않습니다.";
+    case "INVALID_KEY":
+      return "브이월드 인증키가 유효하지 않습니다.";
+    case "OVER_REQUEST_LIMIT":
+      return "브이월드 요청 한도를 초과했습니다.";
+    case "SYSTEM_ERROR":
+      return "브이월드 시스템 오류가 발생했습니다.";
+    default:
+      return "브이월드 Data API 응답 처리 중 오류가 발생했습니다.";
+  }
+}
 
 function parseBbox(raw: string | null) {
   if (!raw) {
@@ -141,15 +179,42 @@ export async function GET(req: NextRequest) {
   }
 
   const bodyText = await upstreamResponse.text();
+  const contentType = upstreamResponse.headers.get("content-type") ?? "";
+  const knownErrorCode = detectKnownErrorCode(bodyText);
   let payload: unknown = null;
   try {
     payload = JSON.parse(bodyText) as unknown;
   } catch {
+    if (knownErrorCode) {
+      return NextResponse.json(
+        {
+          error: knownErrorCode,
+          message: getErrorMessageByCode(knownErrorCode),
+          upstreamStatus: upstreamResponse.status,
+          upstreamContentType: contentType
+        },
+        { status: mapErrorCodeToStatus(knownErrorCode, upstreamResponse.status || 502) }
+      );
+    }
+
+    if (!upstreamResponse.ok) {
+      return NextResponse.json(
+        {
+          error: "VWORLD_DATA_NON_JSON_ERROR",
+          message: "브이월드 Data API가 JSON이 아닌 오류 응답을 반환했습니다.",
+          upstreamStatus: upstreamResponse.status,
+          upstreamContentType: contentType
+        },
+        { status: upstreamResponse.status }
+      );
+    }
+
     return NextResponse.json(
       {
         error: "INVALID_DATA_API_JSON",
         message: "브이월드 Data API 응답이 JSON 형식이 아닙니다.",
-        upstreamStatus: upstreamResponse.status
+        upstreamStatus: upstreamResponse.status,
+        upstreamContentType: contentType
       },
       { status: 502 }
     );
@@ -157,26 +222,30 @@ export async function GET(req: NextRequest) {
 
   if (!upstreamResponse.ok) {
     const extracted = extractErrorMessage(payload);
+    const resolvedCode = detectKnownErrorCode(JSON.stringify(payload)) ?? extracted.code;
     return NextResponse.json(
       {
-        error: extracted.code,
-        message: extracted.message,
-        upstreamStatus: upstreamResponse.status
+        error: resolvedCode,
+        message: getErrorMessageByCode(resolvedCode) || extracted.message,
+        upstreamStatus: upstreamResponse.status,
+        upstreamContentType: contentType
       },
-      { status: upstreamResponse.status }
+      { status: mapErrorCodeToStatus(resolvedCode, upstreamResponse.status) }
     );
   }
 
   const extracted = extractErrorMessage(payload);
   const statusText = String((payload as { response?: { status?: string } })?.response?.status ?? "OK").toUpperCase();
   if (statusText !== "OK" && statusText !== "SUCCESS") {
+    const resolvedCode = detectKnownErrorCode(JSON.stringify(payload)) ?? extracted.code;
     return NextResponse.json(
       {
-        error: extracted.code,
-        message: extracted.message,
-        upstreamStatus: upstreamResponse.status
+        error: resolvedCode,
+        message: getErrorMessageByCode(resolvedCode) || extracted.message,
+        upstreamStatus: upstreamResponse.status,
+        upstreamContentType: contentType
       },
-      { status: 502 }
+      { status: mapErrorCodeToStatus(resolvedCode, 502) }
     );
   }
 

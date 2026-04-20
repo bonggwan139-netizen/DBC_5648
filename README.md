@@ -34,11 +34,11 @@ Set these in Vercel (Production) or local `.env` if needed:
 NEXT_PUBLIC_ENABLE_MAP_SERVICE=true
 NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_key
 NEXT_PUBLIC_VWORLD_REFERRER=https://dbc-5648.vercel.app
-NEXT_PUBLIC_VWORLD_DOMAIN=dbc-5648.vercel.app
+NEXT_PUBLIC_VWORLD_DOMAIN=https://dbc-5648.vercel.app
 NEXT_PUBLIC_VWORLD_3D_BOOTSTRAP_URL=https://map.vworld.kr/js/webglMapInit.js.do
 NEXT_PUBLIC_VWORLD_3D_VERSION=3.0
 VWORLD_API_KEY=optional_alias_of_same_key
-VWORLD_DOMAIN=dbc-5648.vercel.app
+VWORLD_DOMAIN=https://dbc-5648.vercel.app
 ```
 
 `/portfolio/dbc-map` 지적도(연속지적도)는 브라우저에서 VWorld를 직접 호출하지 않고, 서버 프록시(`/api/vworld/data`)를 통해 호출됩니다.
