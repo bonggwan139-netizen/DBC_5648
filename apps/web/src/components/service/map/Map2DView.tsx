@@ -12,18 +12,19 @@ import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
 import { createVworldStyle, ROAD_LAYER_ID, SATELLITE_LAYER_ID } from "./vworldStyle";
 import type { Base2DStyle } from "./types";
 import { MapEnvGuardNotice } from "./MapEnvGuardNotice";
+import {
+  addCadastralLayers,
+  CADASTRAL_HIT_LAYER_ID,
+  CADASTRAL_LINE_ACTIVE_LAYER_ID,
+  CADASTRAL_LINE_LAYER_ID,
+  CADASTRAL_SOURCE_ID
+} from "./cadastralLayerStyle";
 
 type Map2DViewProps = {
   showStyleSelector: boolean;
 };
 
 type ParcelProps = Record<string, unknown>;
-
-const WFS_SOURCE_ID = "vworld-cadastral-wfs";
-const WFS_LINE_LAYER_ID = "vworld-cadastral-line";
-const WFS_FILL_LAYER_ID = "vworld-cadastral-fill";
-const WFS_FILL_ACTIVE_LAYER_ID = "vworld-cadastral-fill-active";
-const WFS_MOVEEND_DEBOUNCE_MS = 300;
 
 type FeatureCollectionLike = {
   type: "FeatureCollection";
@@ -32,6 +33,11 @@ type FeatureCollectionLike = {
     geometry: unknown;
     properties: ParcelProps & { _parcel_id?: string | null; _selected?: boolean };
   }>;
+};
+
+type CadastralFetchMeta = {
+  featureCount: number;
+  cappedBySize: boolean;
 };
 
 function createEmptyFeatureCollection(): FeatureCollectionLike {
@@ -82,7 +88,7 @@ function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: strin
 function createBoundsKey(map: MapLibreMap) {
   const bounds = map.getBounds();
   return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
-    .map((v) => v.toFixed(5))
+    .map((v) => v.toFixed(4))
     .join(",");
 }
 
@@ -96,7 +102,10 @@ function buildProxyDataUrl(map: MapLibreMap) {
   return `/api/vworld/data?${params.toString()}`;
 }
 
-async function fetchCadastralFeatureCollection(map: MapLibreMap, signal?: AbortSignal): Promise<FeatureCollectionLike> {
+async function fetchCadastralFeatureCollection(
+  map: MapLibreMap,
+  signal?: AbortSignal
+): Promise<{ fc: FeatureCollectionLike; meta: CadastralFetchMeta }> {
   const res = await fetch(buildProxyDataUrl(map), {
     method: "GET",
     signal,
@@ -113,7 +122,17 @@ async function fetchCadastralFeatureCollection(map: MapLibreMap, signal?: AbortS
     throw new Error(message || `Data API request failed: ${res.status}`);
   }
 
-  return toFeatureCollection(payload);
+  const fc = toFeatureCollection(payload);
+  const featureCount = Number(res.headers.get("x-vworld-feature-count") ?? fc.features.length);
+  const cappedBySize = res.headers.get("x-vworld-feature-capped") === "true";
+
+  return {
+    fc,
+    meta: {
+      featureCount: Number.isFinite(featureCount) ? featureCount : fc.features.length,
+      cappedBySize
+    }
+  };
 }
 
 export function Map2DView({ showStyleSelector }: Map2DViewProps) {
@@ -126,7 +145,8 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [styleType, setStyleType] = useState<Base2DStyle>("road");
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
-  const [wfsError, setWfsError] = useState<string | null>(null);
+  const [dataApiError, setDataApiError] = useState<string | null>(null);
+  const [lastFetchMeta, setLastFetchMeta] = useState<CadastralFetchMeta | null>(null);
 
   useEffect(() => {
     if (!isMapRenderable) {
@@ -159,56 +179,26 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
 
       map.on("load", () => {
-        map.addSource(WFS_SOURCE_ID, {
+        map.addSource(CADASTRAL_SOURCE_ID, {
           type: "geojson",
           data: createEmptyFeatureCollection()
         });
-
-        map.addLayer({
-          id: WFS_FILL_LAYER_ID,
-          type: "fill",
-          source: WFS_SOURCE_ID,
-          minzoom: 14,
-          paint: {
-            "fill-color": "#1d4ed8",
-            "fill-opacity": 0.07
-          }
-        });
-
-        map.addLayer({
-          id: WFS_FILL_ACTIVE_LAYER_ID,
-          type: "fill",
-          source: WFS_SOURCE_ID,
-          minzoom: 14,
-          paint: {
-            "fill-color": "#2563eb",
-            "fill-opacity": 0.2
-          },
-          filter: ["==", ["get", "_selected"], true]
-        });
-
-        map.addLayer({
-          id: WFS_LINE_LAYER_ID,
-          type: "line",
-          source: WFS_SOURCE_ID,
-          minzoom: 14,
-          paint: {
-            "line-color": "#1d4ed8",
-            "line-width": 1.2
-          }
-        });
+        addCadastralLayers(map);
 
         const setSourceData = (data: FeatureCollectionLike) => {
-          const source = map.getSource(WFS_SOURCE_ID) as { setData?: (next: FeatureCollectionLike) => void } | undefined;
+          const source = map.getSource(CADASTRAL_SOURCE_ID) as
+            | { setData?: (next: FeatureCollectionLike) => void }
+            | undefined;
           source?.setData?.(data);
         };
 
-        const refreshWfs = async (selectedId: string | null = null, force = false) => {
+        const refreshCadastralData = async (selectedId: string | null = null, force = false) => {
           const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
           if (currentZoom < MAP_DATA_MIN_ZOOM) {
             lastBoundsKeyRef.current = "";
             setSourceData(createEmptyFeatureCollection());
-            setWfsError(null);
+            setDataApiError(null);
+            setLastFetchMeta(null);
             return;
           }
 
@@ -223,34 +213,36 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           pendingFetchRef.current = controller;
 
           try {
-            const fc = await fetchCadastralFeatureCollection(map, controller.signal);
+            const { fc, meta } = await fetchCadastralFeatureCollection(map, controller.signal);
             if (controller.signal.aborted) {
               return;
             }
 
             setSourceData(normalizeFeatureCollection(fc, selectedId));
-            setWfsError(null);
+            setDataApiError(null);
+            setLastFetchMeta(meta);
           } catch (error) {
             if (controller.signal.aborted) {
               return;
             }
 
             setSourceData(createEmptyFeatureCollection());
-            setWfsError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
+            setDataApiError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
+            setLastFetchMeta(null);
           }
         };
 
-        const scheduleRefreshWfs = () => {
+        const scheduleRefreshCadastralData = () => {
           if (debounceTimerRef.current !== null) {
             window.clearTimeout(debounceTimerRef.current);
           }
 
           debounceTimerRef.current = window.setTimeout(() => {
-            void refreshWfs(null, false);
+            void refreshCadastralData(null, false);
           }, MAP_DATA_MOVEEND_DEBOUNCE_MS);
         };
 
-        map.on("moveend", scheduleRefreshWfs);
+        map.on("moveend", scheduleRefreshCadastralData);
 
         const handleParcelClick = (event: unknown) => {
           const e = event as {
@@ -264,13 +256,14 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           const picked = (e.features[0].properties ?? {}) as ParcelProps;
           const pickedId = pickParcelId(picked);
           setSelectedParcel(picked);
-          void refreshWfs(pickedId, true);
+          void refreshCadastralData(pickedId, true);
         };
 
-        map.on("click", WFS_FILL_LAYER_ID, handleParcelClick);
-        map.on("click", WFS_FILL_ACTIVE_LAYER_ID, handleParcelClick);
+        map.on("click", CADASTRAL_HIT_LAYER_ID, handleParcelClick);
+        map.on("click", CADASTRAL_LINE_LAYER_ID, handleParcelClick);
+        map.on("click", CADASTRAL_LINE_ACTIVE_LAYER_ID, handleParcelClick);
 
-        void refreshWfs();
+        void refreshCadastralData();
         setIsMapReady(true);
       });
 
@@ -341,14 +334,18 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
       <div className="absolute right-6 top-5 z-10 rounded-xl border border-blue-100 bg-white/92 p-3 text-xs text-slate-600 shadow-sm backdrop-blur">
         <p className="font-semibold text-slate-700">지적 Data API</p>
+        <p className="mt-1">선 중심 표시 (fill 미표시)</p>
         <p className="mt-1">줌 14 이상에서 표시/조회</p>
         <p className="mt-1">클릭 시 속성 확인 가능</p>
+        {lastFetchMeta?.cappedBySize ? (
+          <p className="mt-1 text-[11px] text-amber-700">요청 size 상한에 도달해 일부 구간이 비어 보일 수 있습니다.</p>
+        ) : null}
       </div>
 
-      {wfsError ? (
+      {dataApiError ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-rose-200 bg-white/95 p-3 text-[11px] text-rose-700 shadow-sm backdrop-blur">
           <p className="font-semibold">지적도 조회 오류</p>
-          <p className="mt-1 break-words">{wfsError}</p>
+          <p className="mt-1 break-words">{dataApiError}</p>
         </div>
       ) : null}
 
