@@ -51,6 +51,27 @@ type BoundsRequestInfo = {
   key: string;
 };
 
+
+const BBOX_NOTICE_MESSAGE = "현재 화면 범위가 넓어 지적도 조회를 생략했습니다. 지도를 더 확대해 주세요.";
+
+type DataApiErrorPayload = {
+  error?: string;
+  errorCode?: string;
+  message?: string;
+};
+
+class DataApiRequestError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "DataApiRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function createEmptyFeatureCollection(): FeatureCollectionLike {
   return {
     type: "FeatureCollection",
@@ -161,10 +182,10 @@ function buildProxyDataUrl(bbox: string) {
 }
 
 async function fetchCadastralFeatureCollection(
-  map: MapLibreMap,
+  bbox: string,
   signal?: AbortSignal
 ): Promise<{ fc: FeatureCollectionLike; meta: CadastralFetchMeta }> {
-  const res = await fetch(buildProxyDataUrl(map), {
+  const res = await fetch(buildProxyDataUrl(bbox), {
     method: "GET",
     signal,
     cache: "no-store"
@@ -173,14 +194,10 @@ async function fetchCadastralFeatureCollection(
   const payload = (await res.json().catch(() => null)) as FeatureCollectionLike | DataApiErrorPayload | null;
 
   if (!res.ok) {
-    const code =
-      payload && typeof payload === "object"
-        ? (payload.errorCode ?? payload.error)
-        : undefined;
+    const errorPayload = payload && typeof payload === "object" ? (payload as DataApiErrorPayload) : undefined;
+    const code = errorPayload?.errorCode ?? errorPayload?.error;
     const message =
-      payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
-        ? payload.message
-        : `Data API request failed: ${res.status}`;
+      typeof errorPayload?.message === "string" ? errorPayload.message : `Data API request failed: ${res.status}`;
 
     throw new DataApiRequestError(message, res.status, code);
   }
@@ -210,7 +227,17 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
   const [dataApiError, setDataApiError] = useState<string | null>(null);
+  const [dataApiNotice, setDataApiNotice] = useState<string | null>(null);
   const [lastFetchMeta, setLastFetchMeta] = useState<CadastralFetchMeta | null>(null);
+
+  const resetPendingRequest = () => {
+    pendingFetchRef.current?.abort();
+    pendingFetchRef.current = null;
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (!isMapRenderable) {
@@ -298,13 +325,14 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           activeRequestIdRef.current = requestId;
 
           try {
-            const { fc, meta } = await fetchCadastralFeatureCollection(map, controller.signal);
+            const { fc, meta } = await fetchCadastralFeatureCollection(requestInfo.bbox, controller.signal);
             if (controller.signal.aborted) {
               return;
             }
 
             setSourceData(normalizeFeatureCollection(fc, selectedId));
             setDataApiError(null);
+            setDataApiNotice(null);
             setLastFetchMeta(meta);
           } catch (error) {
             if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
@@ -313,6 +341,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
             setSourceData(createEmptyFeatureCollection());
             setDataApiError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
+            setDataApiNotice(null);
             setLastFetchMeta(null);
           }
         };
@@ -427,6 +456,14 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           <p className="mt-1 text-[11px] text-amber-700">요청 size 상한에 도달해 일부 구간이 비어 보일 수 있습니다.</p>
         ) : null}
       </div>
+
+
+      {dataApiNotice ? (
+        <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
+          <p className="font-semibold">지적도 조회 안내</p>
+          <p className="mt-1 break-words">{dataApiNotice}</p>
+        </div>
+      ) : null}
 
       {dataApiError ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-rose-200 bg-white/95 p-3 text-[11px] text-rose-700 shadow-sm backdrop-blur">
