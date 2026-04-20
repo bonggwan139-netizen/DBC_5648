@@ -10,6 +10,20 @@ const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
 const KNOWN_VWORLD_ERROR_CODES = ["INCORRECT_KEY", "INVALID_KEY", "OVER_REQUEST_LIMIT", "SYSTEM_ERROR"] as const;
 type KnownVworldErrorCode = (typeof KNOWN_VWORLD_ERROR_CODES)[number];
 const UPSTREAM_BODY_SNIPPET_MAX = 320;
+const UPSTREAM_TIMEOUT_MS = 8000;
+const UPSTREAM_MAX_RETRIES = 1;
+const UPSTREAM_RETRY_BACKOFF_MS = 250;
+const MAX_BBOX_AREA = 0.35;
+const RETRIABLE_FETCH_ERROR_CODES = new Set([
+  "UND_ERR_SOCKET",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ETIMEDOUT",
+  "ENETUNREACH",
+  "EAI_AGAIN"
+]);
 
 type FeatureCollectionLike = {
   type: "FeatureCollection";
@@ -92,6 +106,21 @@ function extractFetchErrorCode(error: unknown) {
   return null;
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isRetriableFetchErrorCode(code: string | null) {
+  if (!code) {
+    return false;
+  }
+
+  const normalized = code.toUpperCase();
+  return RETRIABLE_FETCH_ERROR_CODES.has(normalized) || normalized.startsWith("UND_ERR_");
+}
+
 function parseBbox(raw: string | null) {
   if (!raw) {
     return null;
@@ -107,6 +136,9 @@ function parseBbox(raw: string | null) {
     return null;
   }
   if (minX < -180 || maxX > 180 || minY < -90 || maxY > 90) {
+    return null;
+  }
+  if ((maxX - minX) * (maxY - minY) > MAX_BBOX_AREA) {
     return null;
   }
 
@@ -201,26 +233,72 @@ export async function GET(req: NextRequest) {
   });
 
   const safeUpstreamQueryForDebug = buildSafeUpstreamQueryForDebug(params);
-  let upstreamResponse: Response;
-  try {
-    upstreamResponse = await fetch(`${VWORLD_DATA_URL}?${params.toString()}`, {
-      method: "GET",
-      cache: "no-store"
-    });
-  } catch (error) {
-    const fetchErrorCode = extractFetchErrorCode(error);
+  let upstreamResponse: Response | null = null;
+  let lastFetchErrorCode: string | null = null;
+
+  for (let attempt = 0; attempt <= UPSTREAM_MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${VWORLD_DATA_URL}?${params.toString()}`, {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      if (response.status >= 500 && attempt < UPSTREAM_MAX_RETRIES) {
+        await delay(UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1));
+        continue;
+      }
+
+      upstreamResponse = response;
+      break;
+    } catch (error) {
+      clearTimeout(timeout);
+      const fetchErrorCode = extractFetchErrorCode(error) ?? ((error as { name?: string })?.name ?? null);
+      lastFetchErrorCode = fetchErrorCode;
+
+      if (attempt < UPSTREAM_MAX_RETRIES && isRetriableFetchErrorCode(fetchErrorCode)) {
+        await delay(UPSTREAM_RETRY_BACKOFF_MS * (attempt + 1));
+        continue;
+      }
+
+      return NextResponse.json(
+        {
+          error: "VWORLD_DATA_UPSTREAM_FETCH_FAILED",
+          message: "브이월드 Data API 상위 서버 연결에 실패했습니다.",
+          errorCode: fetchErrorCode
+            ? `FETCH_${fetchErrorCode.toUpperCase()}`
+            : "FETCH_CONNECTION_ERROR",
+          ...(shouldExposeDebugSnippet()
+            ? {
+                debug: {
+                  upstreamPath: "/req/data",
+                  upstreamQuery: safeUpstreamQueryForDebug,
+                  retryCount: attempt
+                }
+              }
+            : {})
+        },
+        { status: 502 }
+      );
+    }
+  }
+
+  if (!upstreamResponse) {
     return NextResponse.json(
       {
         error: "VWORLD_DATA_UPSTREAM_FETCH_FAILED",
         message: "브이월드 Data API 상위 서버 연결에 실패했습니다.",
-        errorCode: fetchErrorCode
-          ? `FETCH_${fetchErrorCode.toUpperCase()}`
-          : "FETCH_CONNECTION_ERROR",
+        errorCode: lastFetchErrorCode ? `FETCH_${lastFetchErrorCode.toUpperCase()}` : "FETCH_CONNECTION_ERROR",
         ...(shouldExposeDebugSnippet()
           ? {
               debug: {
                 upstreamPath: "/req/data",
-                upstreamQuery: safeUpstreamQueryForDebug
+                upstreamQuery: safeUpstreamQueryForDebug,
+                retryCount: UPSTREAM_MAX_RETRIES
               }
             }
           : {})

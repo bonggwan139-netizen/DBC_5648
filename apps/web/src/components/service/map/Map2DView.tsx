@@ -81,7 +81,7 @@ function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: strin
 function createBoundsKey(map: MapLibreMap) {
   const bounds = map.getBounds();
   return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
-    .map((v) => v.toFixed(5))
+    .map((v) => v.toFixed(4))
     .join(",");
 }
 
