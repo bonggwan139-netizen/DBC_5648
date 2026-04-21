@@ -247,6 +247,11 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let wheelTarget: HTMLDivElement | null = null;
+    let handleDiscreteWheelZoom: ((event: WheelEvent) => void) | null = null;
+    let wheelDeltaAccumulator = 0;
+    let wheelZoomTarget: number | null = null;
+    let wheelIdleTimer: number | null = null;
 
     const setupMap = async () => {
       if (!mapContainerRef.current || mapRef.current || !isMapRenderable) {
@@ -258,14 +263,69 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         return;
       }
 
+      const mapMinZoom = 6;
+      const mapMaxZoom = 19;
       const map = new maplibregl.Map({
         container: mapContainerRef.current,
         style: createVworldStyle(mapPublicEnv.vworldApiKey),
         center: MAP_DEFAULT_CENTER,
         zoom: 16,
-        minZoom: 6,
-        maxZoom: 19
+        minZoom: mapMinZoom,
+        maxZoom: mapMaxZoom
       });
+      const zoomableMap = map as unknown as {
+        getZoom: () => number;
+        setZoom: (zoom: number) => void;
+        easeTo?: (options: { zoom: number; duration?: number; essential?: boolean }) => void;
+        scrollZoom?: { disable?: () => void };
+      };
+
+      zoomableMap.scrollZoom?.disable?.();
+      wheelTarget = mapContainerRef.current;
+      handleDiscreteWheelZoom = (event: WheelEvent) => {
+        const normalizedDelta =
+          event.deltaY *
+          (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 40 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 400 : 1);
+        if (normalizedDelta === 0) {
+          return;
+        }
+
+        event.preventDefault();
+        wheelDeltaAccumulator += normalizedDelta;
+        if (wheelIdleTimer !== null) {
+          window.clearTimeout(wheelIdleTimer);
+        }
+
+        wheelIdleTimer = window.setTimeout(() => {
+          wheelDeltaAccumulator = 0;
+          wheelZoomTarget = null;
+          wheelIdleTimer = null;
+        }, 160);
+
+        const wheelStepThreshold = 120;
+        const stepCount = Math.trunc(Math.abs(wheelDeltaAccumulator) / wheelStepThreshold);
+        if (stepCount === 0) {
+          return;
+        }
+
+        const zoomDirection = wheelDeltaAccumulator < 0 ? 1 : -1;
+        wheelDeltaAccumulator -= Math.sign(wheelDeltaAccumulator) * stepCount * wheelStepThreshold;
+
+        const baseZoom = wheelZoomTarget ?? Math.round(zoomableMap.getZoom() * 2) / 2;
+        const nextTargetZoom = Math.max(mapMinZoom, Math.min(mapMaxZoom, baseZoom + zoomDirection * stepCount * 0.5));
+        if (nextTargetZoom === wheelZoomTarget) {
+          return;
+        }
+
+        wheelZoomTarget = nextTargetZoom;
+        if (zoomableMap.easeTo) {
+          zoomableMap.easeTo({ zoom: nextTargetZoom, duration: 180, essential: true });
+          return;
+        }
+
+        zoomableMap.setZoom(nextTargetZoom);
+      };
+      wheelTarget.addEventListener("wheel", handleDiscreteWheelZoom, { passive: false });
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
 
@@ -388,6 +448,12 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
     return () => {
       cancelled = true;
+      if (wheelTarget && handleDiscreteWheelZoom) {
+        wheelTarget.removeEventListener("wheel", handleDiscreteWheelZoom);
+      }
+      if (wheelIdleTimer !== null) {
+        window.clearTimeout(wheelIdleTimer);
+      }
       if (debounceTimerRef.current !== null) {
         window.clearTimeout(debounceTimerRef.current);
       }
