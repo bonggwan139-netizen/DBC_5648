@@ -51,10 +51,16 @@ type BoundsRequestInfo = {
   key: string;
 };
 
-
 const BBOX_NOTICE_MESSAGE = "현재 화면 범위가 넓어 지적도 조회를 생략했습니다. 지도를 더 확대해 주세요.";
 
 type DataApiErrorPayload = {
+  error?: string;
+  errorCode?: string;
+  message?: string;
+};
+
+type ParcelAreaApiPayload = {
+  area?: number | string | null;
   error?: string;
   errorCode?: string;
   message?: string;
@@ -98,6 +104,29 @@ function pickParcelId(props: ParcelProps) {
   return found ? String(props[found]) : null;
 }
 
+function pickParcelValue(props: ParcelProps, candidates: string[]) {
+  const found = candidates.find((key) => props[key] !== undefined && props[key] !== null);
+  return found ? props[found] : null;
+}
+
+function parseNumericValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.replace(/,/g, "").trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
 function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: string | null = null): FeatureCollectionLike {
   return {
     ...fc,
@@ -116,7 +145,6 @@ function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: strin
     })
   };
 }
-
 
 function roundCoord(value: number, precision: number) {
   return Number(value.toFixed(precision));
@@ -215,17 +243,58 @@ async function fetchCadastralFeatureCollection(
   };
 }
 
+async function fetchParcelArea(pnu: string, signal?: AbortSignal): Promise<number | null> {
+  const params = new URLSearchParams({ pnu });
+  const res = await fetch(`/api/vworld/parcel-area?${params.toString()}`, {
+    method: "GET",
+    signal,
+    cache: "no-store"
+  });
+
+  const payload = (await res.json().catch(() => null)) as ParcelAreaApiPayload | null;
+
+  if (!res.ok) {
+    const errorPayload = payload && typeof payload === "object" ? payload : undefined;
+    const code = errorPayload?.errorCode ?? errorPayload?.error;
+    const message =
+      typeof errorPayload?.message === "string" ? errorPayload.message : `Parcel area API request failed: ${res.status}`;
+
+    throw new DataApiRequestError(message, res.status, code);
+  }
+
+  return parseNumericValue(payload?.area);
+}
+
+const numberFormatter = new Intl.NumberFormat("ko-KR");
+
+function formatAreaDisplay(area: number | null, isLoading: boolean) {
+  if (isLoading) {
+    return "불러오는 중...";
+  }
+
+  return area === null ? "-" : `${numberFormatter.format(area)}㎡`;
+}
+
+function formatJigaDisplay(value: unknown) {
+  const parsed = parseNumericValue(value);
+  return parsed === null ? "-" : `${numberFormatter.format(parsed)}원/㎡`;
+}
+
 export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pendingFetchRef = useRef<AbortController | null>(null);
+  const pendingParcelAreaFetchRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
   const lastBoundsKeyRef = useRef<string>("");
   const activeRequestIdRef = useRef(0);
+  const activeParcelAreaRequestIdRef = useRef(0);
 
   const [styleType, setStyleType] = useState<Base2DStyle>("road");
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
+  const [selectedParcelArea, setSelectedParcelArea] = useState<number | null>(null);
+  const [isSelectedParcelAreaLoading, setIsSelectedParcelAreaLoading] = useState(false);
   const [dataApiError, setDataApiError] = useState<string | null>(null);
   const [dataApiNotice, setDataApiNotice] = useState<string | null>(null);
   const [, setLastFetchMeta] = useState<CadastralFetchMeta | null>(null);
@@ -239,6 +308,57 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     }
   };
 
+  const resetPendingParcelAreaRequest = () => {
+    pendingParcelAreaFetchRef.current?.abort();
+    pendingParcelAreaFetchRef.current = null;
+  };
+
+  const loadSelectedParcelArea = async (pnu: string | null) => {
+    resetPendingParcelAreaRequest();
+    setSelectedParcelArea(null);
+
+    if (!pnu) {
+      setIsSelectedParcelAreaLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    pendingParcelAreaFetchRef.current = controller;
+    const requestId = activeParcelAreaRequestIdRef.current + 1;
+    activeParcelAreaRequestIdRef.current = requestId;
+    setIsSelectedParcelAreaLoading(true);
+
+    try {
+      const area = await fetchParcelArea(pnu, controller.signal);
+      if (controller.signal.aborted || activeParcelAreaRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setSelectedParcelArea(area);
+    } catch {
+      if (controller.signal.aborted || activeParcelAreaRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setSelectedParcelArea(null);
+    } finally {
+      if (controller.signal.aborted || activeParcelAreaRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      pendingParcelAreaFetchRef.current = null;
+      setIsSelectedParcelAreaLoading(false);
+    }
+  };
+
+  const selectedParcelAddressValue = selectedParcel ? pickParcelValue(selectedParcel, ["addr"]) : null;
+  const selectedParcelAddress =
+    typeof selectedParcelAddressValue === "string" && selectedParcelAddressValue.trim()
+      ? selectedParcelAddressValue.trim()
+      : "-";
+  const selectedParcelJiga = formatJigaDisplay(selectedParcel ? pickParcelValue(selectedParcel, ["jiga"]) : null);
+  const selectedParcelAreaDisplay = formatAreaDisplay(selectedParcelArea, isSelectedParcelAreaLoading);
+
   useEffect(() => {
     if (!isMapRenderable) {
       logPublicMapEnvDiagnostics("Map2DView");
@@ -247,11 +367,6 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
   useEffect(() => {
     let cancelled = false;
-    let wheelTarget: HTMLDivElement | null = null;
-    let handleDiscreteWheelZoom: ((event: WheelEvent) => void) | null = null;
-    let wheelDeltaAccumulator = 0;
-    let wheelZoomTarget: number | null = null;
-    let wheelIdleTimer: number | null = null;
 
     const setupMap = async () => {
       if (!mapContainerRef.current || mapRef.current || !isMapRenderable) {
@@ -273,59 +388,6 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         minZoom: mapMinZoom,
         maxZoom: mapMaxZoom
       });
-      const zoomableMap = map as unknown as {
-        getZoom: () => number;
-        setZoom: (zoom: number) => void;
-        easeTo?: (options: { zoom: number; duration?: number; essential?: boolean }) => void;
-        scrollZoom?: { disable?: () => void };
-      };
-
-      zoomableMap.scrollZoom?.disable?.();
-      wheelTarget = mapContainerRef.current;
-      handleDiscreteWheelZoom = (event: WheelEvent) => {
-        const normalizedDelta =
-          event.deltaY *
-          (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 40 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 400 : 1);
-        if (normalizedDelta === 0) {
-          return;
-        }
-
-        event.preventDefault();
-        wheelDeltaAccumulator += normalizedDelta;
-        if (wheelIdleTimer !== null) {
-          window.clearTimeout(wheelIdleTimer);
-        }
-
-        wheelIdleTimer = window.setTimeout(() => {
-          wheelDeltaAccumulator = 0;
-          wheelZoomTarget = null;
-          wheelIdleTimer = null;
-        }, 160);
-
-        const wheelStepThreshold = 120;
-        const stepCount = Math.trunc(Math.abs(wheelDeltaAccumulator) / wheelStepThreshold);
-        if (stepCount === 0) {
-          return;
-        }
-
-        const zoomDirection = wheelDeltaAccumulator < 0 ? 1 : -1;
-        wheelDeltaAccumulator -= Math.sign(wheelDeltaAccumulator) * stepCount * wheelStepThreshold;
-
-        const baseZoom = wheelZoomTarget ?? Math.round(zoomableMap.getZoom() * 2) / 2;
-        const nextTargetZoom = Math.max(mapMinZoom, Math.min(mapMaxZoom, baseZoom + zoomDirection * stepCount * 0.5));
-        if (nextTargetZoom === wheelZoomTarget) {
-          return;
-        }
-
-        wheelZoomTarget = nextTargetZoom;
-        if (zoomableMap.easeTo) {
-          zoomableMap.easeTo({ zoom: nextTargetZoom, duration: 180, essential: true });
-          return;
-        }
-
-        zoomableMap.setZoom(nextTargetZoom);
-      };
-      wheelTarget.addEventListener("wheel", handleDiscreteWheelZoom, { passive: false });
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
 
@@ -430,6 +492,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           const picked = (e.features[0].properties ?? {}) as ParcelProps;
           const pickedId = pickParcelId(picked);
           setSelectedParcel(picked);
+          void loadSelectedParcelArea(pickParcelValue(picked, ["pnu", "PNU"])?.toString() ?? null);
           void refreshCadastralData(pickedId, true);
         };
 
@@ -448,16 +511,11 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
     return () => {
       cancelled = true;
-      if (wheelTarget && handleDiscreteWheelZoom) {
-        wheelTarget.removeEventListener("wheel", handleDiscreteWheelZoom);
-      }
-      if (wheelIdleTimer !== null) {
-        window.clearTimeout(wheelIdleTimer);
-      }
       if (debounceTimerRef.current !== null) {
         window.clearTimeout(debounceTimerRef.current);
       }
       pendingFetchRef.current?.abort();
+      pendingParcelAreaFetchRef.current?.abort();
       mapRef.current?.remove();
       mapRef.current = null;
       setIsMapReady(false);
@@ -519,7 +577,6 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         </div>
       ) : null}
 
-
       {dataApiNotice ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
           <p className="font-semibold">지적도 조회 안내</p>
@@ -536,10 +593,21 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
       {selectedParcel ? (
         <div className="absolute bottom-5 left-6 z-10 w-[340px] rounded-xl border border-slate-200 bg-white/95 p-3 text-[11px] text-slate-700 shadow-sm backdrop-blur">
-          <p className="font-semibold">선택 필지 속성</p>
-          <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all text-[10px] text-slate-600">
-            {JSON.stringify(selectedParcel, null, 2)}
-          </pre>
+          <p className="font-semibold">필지 정보</p>
+          <div className="mt-2 space-y-2 text-[11px]">
+            <div className="flex items-start justify-between gap-4">
+              <span className="shrink-0 text-slate-500">주소</span>
+              <span className="text-right text-slate-700">{selectedParcelAddress}</span>
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <span className="shrink-0 text-slate-500">면적(㎡)</span>
+              <span className="text-right text-slate-700">{selectedParcelAreaDisplay}</span>
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <span className="shrink-0 text-slate-500">개별공시지가(원/㎡)</span>
+              <span className="text-right text-slate-700">{selectedParcelJiga}</span>
+            </div>
+          </div>
         </div>
       ) : null}
 
