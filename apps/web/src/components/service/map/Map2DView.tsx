@@ -239,6 +239,15 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     }
   };
 
+  const resetPendingRequest = () => {
+    pendingFetchRef.current?.abort();
+    pendingFetchRef.current = null;
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  };
+
   useEffect(() => {
     if (!isMapRenderable) {
       logPublicMapEnvDiagnostics("Map2DView");
@@ -445,6 +454,14 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           </button>
         </div>
       ) : null}
+
+      {dataApiNotice ? (
+        <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
+          <p className="font-semibold">지적도 조회 안내</p>
+          <p className="mt-1 break-words">{dataApiNotice}</p>
+        </div>
+      ) : null}
+
 
       {dataApiNotice ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
