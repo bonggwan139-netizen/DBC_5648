@@ -7,7 +7,16 @@ export const VWORLD_3D_DEFAULT_BOOTSTRAP_URL = "https://map.vworld.kr/js/webglMa
 export const VWORLD_3D_DEFAULT_VERSION = "3.0";
 
 export const VWORLD_DATA_LAYER = "LP_PA_CBND_BUBUN";
-export const VWORLD_DATA_MAX_SIZE_LIMIT = 1000;
-export const VWORLD_DATA_DEFAULT_SIZE = 250;
-export const MAP_DATA_MIN_ZOOM = 14;
+export const VWORLD_DATA_MAX_SIZE_LIMIT = 1200;
+export const VWORLD_DATA_DEFAULT_SIZE = 1200;
+export const MAP_DATA_MIN_ZOOM = 15;
 export const MAP_DATA_MOVEEND_DEBOUNCE_MS = 700;
+
+export const MAP_DATA_BBOX_COORD_PRECISION = 6;
+export const MAP_DATA_BBOX_KEY_PRECISION = 4;
+export const MAP_DATA_MAX_BBOX_WIDTH = 0.8;
+export const MAP_DATA_MAX_BBOX_HEIGHT = 0.8;
+export const MAP_DATA_MAX_BBOX_AREA = 0.35;
+export const MAP_DATA_UPSTREAM_TIMEOUT_MS = 8000;
+export const MAP_DATA_UPSTREAM_MAX_RETRIES = 1;
+export const MAP_DATA_UPSTREAM_RETRY_BACKOFF_MS = 250;
