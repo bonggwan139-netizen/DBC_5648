@@ -228,7 +228,16 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
   const [dataApiError, setDataApiError] = useState<string | null>(null);
   const [dataApiNotice, setDataApiNotice] = useState<string | null>(null);
-  const [lastFetchMeta, setLastFetchMeta] = useState<CadastralFetchMeta | null>(null);
+  const [, setLastFetchMeta] = useState<CadastralFetchMeta | null>(null);
+
+  const resetPendingRequest = () => {
+    pendingFetchRef.current?.abort();
+    pendingFetchRef.current = null;
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  };
 
   const resetPendingRequest = () => {
     pendingFetchRef.current?.abort();
@@ -446,16 +455,12 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         </div>
       ) : null}
 
-      <div className="absolute right-6 top-5 z-10 rounded-xl border border-blue-100 bg-white/92 p-3 text-xs text-slate-600 shadow-sm backdrop-blur">
-        <p className="font-semibold text-slate-700">지적 Data API</p>
-        <p className="mt-1">선 중심 표시 (fill 미표시)</p>
-        <p className="mt-1">줌 14 이상에서 표시/조회</p>
-        <p className="mt-1">화면 범위가 넓으면 요청을 생략</p>
-        <p className="mt-1">클릭 시 속성 확인 가능</p>
-        {lastFetchMeta?.cappedBySize ? (
-          <p className="mt-1 text-[11px] text-amber-700">요청 size 상한에 도달해 일부 구간이 비어 보일 수 있습니다.</p>
-        ) : null}
-      </div>
+      {dataApiNotice ? (
+        <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
+          <p className="font-semibold">지적도 조회 안내</p>
+          <p className="mt-1 break-words">{dataApiNotice}</p>
+        </div>
+      ) : null}
 
 
       {dataApiNotice ? (
