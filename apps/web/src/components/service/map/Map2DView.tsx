@@ -239,15 +239,6 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     }
   };
 
-  const resetPendingRequest = () => {
-    pendingFetchRef.current?.abort();
-    pendingFetchRef.current = null;
-    if (debounceTimerRef.current !== null) {
-      window.clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-  };
-
   useEffect(() => {
     if (!isMapRenderable) {
       logPublicMapEnvDiagnostics("Map2DView");
