@@ -17,27 +17,20 @@ import { loadMapLibre, type MapLibreMap } from "./maplibreLoader";
 import { createVworldStyle, ROAD_LAYER_ID, SATELLITE_LAYER_ID } from "./vworldStyle";
 import type { Base2DStyle } from "./types";
 import { MapEnvGuardNotice } from "./MapEnvGuardNotice";
+import { addCadastralLayers, CADASTRAL_SOURCE_ID } from "./cadastralLayerStyle";
 import {
-  addCadastralLayers,
-  CADASTRAL_HIT_LAYER_ID,
-  CADASTRAL_LINE_ACTIVE_LAYER_ID,
-  CADASTRAL_LINE_LAYER_ID,
-  CADASTRAL_SOURCE_ID
-} from "./cadastralLayerStyle";
+  addZoneSelectionOverlayLayers,
+  ZONE_CONFIRMED_SOURCE_ID,
+  ZONE_DRAFT_GEOMETRY_SOURCE_ID,
+  ZONE_DRAFT_VERTEX_SOURCE_ID
+} from "./zone-selection/zoneSelectionMapLayers";
+import { useMapSearch } from "./search/mapSearchState";
+import { createEmptyFeatureCollection } from "./zone-selection/zoneSelectionGeometry";
+import { useZoneSelectionMap } from "./zone-selection/useZoneSelectionMap";
+import type { CadastralFeatureCollection, ParcelProps, ZoneGeometry } from "./zone-selection/zoneSelectionTypes";
 
 type Map2DViewProps = {
   showStyleSelector: boolean;
-};
-
-type ParcelProps = Record<string, unknown>;
-
-type FeatureCollectionLike = {
-  type: "FeatureCollection";
-  features: Array<{
-    type: "Feature";
-    geometry: unknown;
-    properties: ParcelProps & { _parcel_id?: string | null; _selected?: boolean };
-  }>;
 };
 
 type CadastralFetchMeta = {
@@ -50,8 +43,6 @@ type BoundsRequestInfo = {
   bbox: string | null;
   key: string;
 };
-
-const BBOX_NOTICE_MESSAGE = "현재 화면 범위가 넓어 지적도 조회를 생략했습니다. 지도를 더 확대해 주세요.";
 
 type DataApiErrorPayload = {
   error?: string;
@@ -66,6 +57,23 @@ type ParcelAreaApiPayload = {
   message?: string;
 };
 
+type MapClickEventLike = {
+  point?: {
+    x?: number;
+    y?: number;
+  };
+  lngLat?: {
+    lng?: number;
+    lat?: number;
+  };
+  originalEvent?: {
+    button?: number;
+    preventDefault?: () => void;
+  };
+};
+
+const BBOX_NOTICE_MESSAGE = "지적 데이터를 보려면 더 확대해 주세요.";
+
 class DataApiRequestError extends Error {
   status: number;
   code?: string;
@@ -78,30 +86,37 @@ class DataApiRequestError extends Error {
   }
 }
 
-function createEmptyFeatureCollection(): FeatureCollectionLike {
-  return {
-    type: "FeatureCollection",
-    features: []
-  };
+function createEmptyCadastralFeatureCollection(): CadastralFeatureCollection {
+  return createEmptyFeatureCollection<ZoneGeometry, ParcelProps>();
 }
 
-function toFeatureCollection(data: unknown): FeatureCollectionLike {
+function toFeatureCollection(data: unknown): CadastralFeatureCollection {
   if (
     data &&
     typeof data === "object" &&
     (data as { type?: string }).type === "FeatureCollection" &&
     Array.isArray((data as { features?: unknown[] }).features)
   ) {
-    return data as FeatureCollectionLike;
+    return data as CadastralFeatureCollection;
   }
 
-  return createEmptyFeatureCollection();
+  return createEmptyCadastralFeatureCollection();
 }
 
-function pickParcelId(props: ParcelProps) {
-  const candidates = ["pnu", "PNU", "uid", "id", "parcel_id"];
-  const found = candidates.find((k) => props[k] !== undefined && props[k] !== null);
-  return found ? String(props[found]) : null;
+function pickParcelSelectionKey(props: ParcelProps) {
+  if (props.pnu !== undefined && props.pnu !== null) {
+    return String(props.pnu);
+  }
+
+  if (props.PNU !== undefined && props.PNU !== null) {
+    return String(props.PNU);
+  }
+
+  if (props.parcel_id !== undefined && props.parcel_id !== null) {
+    return String(props.parcel_id);
+  }
+
+  return null;
 }
 
 function pickParcelValue(props: ParcelProps, candidates: string[]) {
@@ -127,34 +142,8 @@ function parseNumericValue(value: unknown) {
   return null;
 }
 
-function normalizeFeatureCollection(fc: FeatureCollectionLike, selectedId: string | null = null): FeatureCollectionLike {
-  return {
-    ...fc,
-    features: fc.features.map((feature) => {
-      const props = (feature.properties ?? {}) as ParcelProps;
-      const featureId = pickParcelId(props);
-
-      return {
-        ...feature,
-        properties: {
-          ...props,
-          _parcel_id: featureId,
-          _selected: selectedId !== null && featureId === selectedId
-        }
-      };
-    })
-  };
-}
-
 function roundCoord(value: number, precision: number) {
   return Number(value.toFixed(precision));
-}
-
-function createBoundsKey(map: MapLibreMap) {
-  const bounds = map.getBounds();
-  return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
-    .map((v) => v.toFixed(4))
-    .join(",");
 }
 
 function buildBoundsRequestInfo(map: MapLibreMap): BoundsRequestInfo {
@@ -212,14 +201,14 @@ function buildProxyDataUrl(bbox: string) {
 async function fetchCadastralFeatureCollection(
   bbox: string,
   signal?: AbortSignal
-): Promise<{ fc: FeatureCollectionLike; meta: CadastralFetchMeta }> {
+): Promise<{ fc: CadastralFeatureCollection; meta: CadastralFetchMeta }> {
   const res = await fetch(buildProxyDataUrl(bbox), {
     method: "GET",
     signal,
     cache: "no-store"
   });
 
-  const payload = (await res.json().catch(() => null)) as FeatureCollectionLike | DataApiErrorPayload | null;
+  const payload = (await res.json().catch(() => null)) as CadastralFeatureCollection | DataApiErrorPayload | null;
 
   if (!res.ok) {
     const errorPayload = payload && typeof payload === "object" ? (payload as DataApiErrorPayload) : undefined;
@@ -275,9 +264,14 @@ function formatAreaDisplay(area: number | null, isLoading: boolean) {
   return area === null ? "-" : `${numberFormatter.format(area)}㎡`;
 }
 
-function formatJigaDisplay(value: unknown) {
+function formatCurrencyDisplay(value: unknown) {
   const parsed = parseNumericValue(value);
-  return parsed === null ? "-" : `${numberFormatter.format(parsed)}원/㎡`;
+  return parsed === null ? "-" : `${numberFormatter.format(parsed)}원`;
+}
+
+function setGeoJsonSourceData(map: MapLibreMap | null, sourceId: string, data: { type: "FeatureCollection"; features: unknown[] }) {
+  const source = map?.getSource(sourceId);
+  source?.setData(data);
 }
 
 export function Map2DView({ showStyleSelector }: Map2DViewProps) {
@@ -292,6 +286,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
   const [styleType, setStyleType] = useState<Base2DStyle>("road");
   const [isMapReady, setIsMapReady] = useState(false);
+  const [cadastralData, setCadastralData] = useState<CadastralFeatureCollection>(createEmptyCadastralFeatureCollection);
   const [selectedParcel, setSelectedParcel] = useState<ParcelProps | null>(null);
   const [selectedParcelArea, setSelectedParcelArea] = useState<number | null>(null);
   const [isSelectedParcelAreaLoading, setIsSelectedParcelAreaLoading] = useState(false);
@@ -299,9 +294,40 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [dataApiNotice, setDataApiNotice] = useState<string | null>(null);
   const [, setLastFetchMeta] = useState<CadastralFetchMeta | null>(null);
 
+  const selectedInfoParcelId = selectedParcel ? pickParcelSelectionKey(selectedParcel) : null;
+  const { state: mapSearchState, consumePendingNavigation } = useMapSearch();
+
+  const {
+    decoratedVisibleFeatures,
+    draftGeometryCollection,
+    draftVertexCollection,
+    confirmedZoneCollection,
+    handleMapClick,
+    handleMapMouseMove,
+    handleMapContextMenu,
+    isDrawModeActive,
+    isInteractionLocked
+  } = useZoneSelectionMap({
+    map: mapRef.current,
+    visibleFeatures: cadastralData,
+    selectedInfoParcelId,
+    onSelectInfoParcel: (parcel) => {
+      setSelectedParcel(parcel);
+      void loadSelectedParcelArea(pickParcelValue(parcel, ["pnu", "PNU"])?.toString() ?? null);
+    }
+  });
+
+  const refreshCadastralDataRef = useRef<(force?: boolean) => Promise<void>>(async () => {});
+  const scheduleRefreshCadastralDataRef = useRef<() => void>(() => {});
+  const handleMapClickEventRef = useRef<(event: unknown) => void>(() => {});
+  const handleMapMouseMoveEventRef = useRef<(event: unknown) => void>(() => {});
+  const handleMapContextMenuEventRef = useRef<(event: unknown) => void>(() => {});
+  const drawModeRef = useRef(false);
+
   const resetPendingRequest = () => {
     pendingFetchRef.current?.abort();
     pendingFetchRef.current = null;
+
     if (debounceTimerRef.current !== null) {
       window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
@@ -351,12 +377,200 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     }
   };
 
+  const refreshCadastralData = async (force = false) => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+
+    const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
+    if (currentZoom < MAP_DATA_MIN_ZOOM) {
+      resetPendingRequest();
+      lastBoundsKeyRef.current = "";
+      setCadastralData(createEmptyCadastralFeatureCollection());
+      setDataApiError(null);
+      setDataApiNotice(null);
+      setLastFetchMeta(null);
+      return;
+    }
+
+    const requestInfo = buildBoundsRequestInfo(map);
+    if (requestInfo.blockedReason === "bbox-too-large") {
+      resetPendingRequest();
+      lastBoundsKeyRef.current = requestInfo.key;
+      setCadastralData(createEmptyCadastralFeatureCollection());
+      setDataApiError(null);
+      setDataApiNotice(BBOX_NOTICE_MESSAGE);
+      setLastFetchMeta(null);
+      return;
+    }
+
+    if (requestInfo.blockedReason === "bbox-invalid" || !requestInfo.bbox) {
+      resetPendingRequest();
+      lastBoundsKeyRef.current = "";
+      setCadastralData(createEmptyCadastralFeatureCollection());
+      setDataApiError("현재 지도 범위를 계산할 수 없습니다.");
+      setDataApiNotice(null);
+      setLastFetchMeta(null);
+      return;
+    }
+
+    if (!force && requestInfo.key === lastBoundsKeyRef.current) {
+      return;
+    }
+
+    lastBoundsKeyRef.current = requestInfo.key;
+    pendingFetchRef.current?.abort();
+    const controller = new AbortController();
+    pendingFetchRef.current = controller;
+    const requestId = activeRequestIdRef.current + 1;
+    activeRequestIdRef.current = requestId;
+
+    try {
+      const { fc, meta } = await fetchCadastralFeatureCollection(requestInfo.bbox, controller.signal);
+      if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setCadastralData(fc);
+      setDataApiError(null);
+      setDataApiNotice(null);
+      setLastFetchMeta(meta);
+    } catch (error) {
+      if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setCadastralData(createEmptyCadastralFeatureCollection());
+      setDataApiError(error instanceof Error ? error.message : "지적 데이터를 불러오지 못했습니다.");
+      setDataApiNotice(null);
+      setLastFetchMeta(null);
+    } finally {
+      if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      pendingFetchRef.current = null;
+    }
+  };
+
+  const scheduleRefreshCadastralData = () => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = window.setTimeout(() => {
+      void refreshCadastralDataRef.current(false);
+    }, MAP_DATA_MOVEEND_DEBOUNCE_MS);
+  };
+
+  const handleMapClickEvent = (event: unknown) => {
+    const rawEvent = event as MapClickEventLike;
+    const point = rawEvent.point;
+    const lngLat = rawEvent.lngLat;
+
+    if (
+      !point ||
+      !lngLat ||
+      typeof point.x !== "number" ||
+      typeof point.y !== "number" ||
+      typeof lngLat.lng !== "number" ||
+      typeof lngLat.lat !== "number"
+    ) {
+      return;
+    }
+
+    if (rawEvent.originalEvent?.button === 2) {
+      return;
+    }
+
+    handleMapClick({
+      point: {
+        x: point.x,
+        y: point.y
+      },
+      lngLat: {
+        lng: lngLat.lng,
+        lat: lngLat.lat
+      }
+    });
+  };
+
+  const handleMapMouseMoveEvent = (event: unknown) => {
+    const rawEvent = event as MapClickEventLike;
+    const point = rawEvent.point;
+    const lngLat = rawEvent.lngLat;
+
+    if (
+      !point ||
+      !lngLat ||
+      typeof point.x !== "number" ||
+      typeof point.y !== "number" ||
+      typeof lngLat.lng !== "number" ||
+      typeof lngLat.lat !== "number"
+    ) {
+      return;
+    }
+
+    handleMapMouseMove({
+      point: {
+        x: point.x,
+        y: point.y
+      },
+      lngLat: {
+        lng: lngLat.lng,
+        lat: lngLat.lat
+      }
+    });
+  };
+
+  const handleMapContextMenuEvent = (event: unknown) => {
+    const rawEvent = event as MapClickEventLike;
+    const point = rawEvent.point;
+    const lngLat = rawEvent.lngLat;
+
+    if (
+      !point ||
+      !lngLat ||
+      typeof point.x !== "number" ||
+      typeof point.y !== "number" ||
+      typeof lngLat.lng !== "number" ||
+      typeof lngLat.lat !== "number"
+    ) {
+      return;
+    }
+
+    handleMapContextMenu({
+      point: {
+        x: point.x,
+        y: point.y
+      },
+      lngLat: {
+        lng: lngLat.lng,
+        lat: lngLat.lat
+      },
+      originalEvent: rawEvent.originalEvent
+    });
+  };
+
+  useEffect(() => {
+    refreshCadastralDataRef.current = refreshCadastralData;
+    scheduleRefreshCadastralDataRef.current = scheduleRefreshCadastralData;
+    handleMapClickEventRef.current = handleMapClickEvent;
+    handleMapMouseMoveEventRef.current = handleMapMouseMoveEvent;
+    handleMapContextMenuEventRef.current = handleMapContextMenuEvent;
+  }, [handleMapClickEvent, handleMapContextMenuEvent, handleMapMouseMoveEvent, refreshCadastralData]);
+
+  useEffect(() => {
+    drawModeRef.current = isDrawModeActive;
+  }, [isDrawModeActive]);
+
   const selectedParcelAddressValue = selectedParcel ? pickParcelValue(selectedParcel, ["addr"]) : null;
   const selectedParcelAddress =
     typeof selectedParcelAddressValue === "string" && selectedParcelAddressValue.trim()
       ? selectedParcelAddressValue.trim()
       : "-";
-  const selectedParcelJiga = formatJigaDisplay(selectedParcel ? pickParcelValue(selectedParcel, ["jiga"]) : null);
+  const selectedParcelJiga = formatCurrencyDisplay(selectedParcel ? pickParcelValue(selectedParcel, ["jiga"]) : null);
   const selectedParcelAreaDisplay = formatAreaDisplay(selectedParcelArea, isSelectedParcelAreaLoading);
 
   useEffect(() => {
@@ -364,6 +578,17 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       logPublicMapEnvDiagnostics("Map2DView");
     }
   }, []);
+
+  useEffect(() => {
+    if (!isInteractionLocked) {
+      return;
+    }
+
+    resetPendingParcelAreaRequest();
+    setSelectedParcel(null);
+    setSelectedParcelArea(null);
+    setIsSelectedParcelAreaLoading(false);
+  }, [isInteractionLocked]);
 
   useEffect(() => {
     let cancelled = false;
@@ -378,15 +603,13 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         return;
       }
 
-      const mapMinZoom = 6;
-      const mapMaxZoom = 19;
       const map = new maplibregl.Map({
         container: mapContainerRef.current,
         style: createVworldStyle(mapPublicEnv.vworldApiKey),
         center: MAP_DEFAULT_CENTER,
         zoom: 16,
-        minZoom: mapMinZoom,
-        maxZoom: mapMaxZoom
+        minZoom: 6,
+        maxZoom: 19
       });
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
@@ -394,113 +617,26 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       map.on("load", () => {
         map.addSource(CADASTRAL_SOURCE_ID, {
           type: "geojson",
-          data: createEmptyFeatureCollection()
+          data: createEmptyCadastralFeatureCollection()
         });
         addCadastralLayers(map);
+        addZoneSelectionOverlayLayers(map);
 
-        const setSourceData = (data: FeatureCollectionLike) => {
-          const source = map.getSource(CADASTRAL_SOURCE_ID) as
-            | { setData?: (next: FeatureCollectionLike) => void }
-            | undefined;
-          source?.setData?.(data);
-        };
+        map.on("moveend", () => {
+          scheduleRefreshCadastralDataRef.current();
+        });
 
-        const refreshCadastralData = async (selectedId: string | null = null, force = false) => {
-          const currentZoom = (map as unknown as { getZoom?: () => number }).getZoom?.() ?? 0;
-          if (currentZoom < MAP_DATA_MIN_ZOOM) {
-            resetPendingRequest();
-            lastBoundsKeyRef.current = "";
-            setSourceData(createEmptyFeatureCollection());
-            setDataApiError(null);
-            setLastFetchMeta(null);
-            return;
-          }
+        map.on("click", (event: unknown) => {
+          handleMapClickEventRef.current(event);
+        });
+        map.on("mousemove", (event: unknown) => {
+          handleMapMouseMoveEventRef.current(event);
+        });
+        map.on("contextmenu", (event: unknown) => {
+          handleMapContextMenuEventRef.current(event);
+        });
 
-          const requestInfo = buildBoundsRequestInfo(map);
-          if (requestInfo.blockedReason === "bbox-too-large") {
-            resetPendingRequest();
-            lastBoundsKeyRef.current = requestInfo.key;
-            setSourceData(createEmptyFeatureCollection());
-            setDataApiError(null);
-            setDataApiNotice(BBOX_NOTICE_MESSAGE);
-            return;
-          }
-
-          if (requestInfo.blockedReason === "bbox-invalid" || !requestInfo.bbox) {
-            resetPendingRequest();
-            lastBoundsKeyRef.current = "";
-            setSourceData(createEmptyFeatureCollection());
-            setDataApiError("현재 지도 범위를 해석하지 못했습니다.");
-            setDataApiNotice(null);
-            return;
-          }
-
-          if (!force && requestInfo.key === lastBoundsKeyRef.current) {
-            return;
-          }
-
-          lastBoundsKeyRef.current = requestInfo.key;
-          pendingFetchRef.current?.abort();
-          const controller = new AbortController();
-          pendingFetchRef.current = controller;
-          const requestId = activeRequestIdRef.current + 1;
-          activeRequestIdRef.current = requestId;
-
-          try {
-            const { fc, meta } = await fetchCadastralFeatureCollection(requestInfo.bbox, controller.signal);
-            if (controller.signal.aborted) {
-              return;
-            }
-
-            setSourceData(normalizeFeatureCollection(fc, selectedId));
-            setDataApiError(null);
-            setDataApiNotice(null);
-            setLastFetchMeta(meta);
-          } catch (error) {
-            if (controller.signal.aborted || activeRequestIdRef.current !== requestId) {
-              return;
-            }
-
-            setSourceData(createEmptyFeatureCollection());
-            setDataApiError(error instanceof Error ? error.message : "지적도 데이터를 불러오지 못했습니다.");
-            setDataApiNotice(null);
-            setLastFetchMeta(null);
-          }
-        };
-
-        const scheduleRefreshCadastralData = () => {
-          if (debounceTimerRef.current !== null) {
-            window.clearTimeout(debounceTimerRef.current);
-          }
-
-          debounceTimerRef.current = window.setTimeout(() => {
-            void refreshCadastralData(null, false);
-          }, MAP_DATA_MOVEEND_DEBOUNCE_MS);
-        };
-
-        map.on("moveend", scheduleRefreshCadastralData);
-
-        const handleParcelClick = (event: unknown) => {
-          const e = event as {
-            features?: Array<{ properties?: ParcelProps }>;
-          };
-
-          if (!e.features || e.features.length === 0) {
-            return;
-          }
-
-          const picked = (e.features[0].properties ?? {}) as ParcelProps;
-          const pickedId = pickParcelId(picked);
-          setSelectedParcel(picked);
-          void loadSelectedParcelArea(pickParcelValue(picked, ["pnu", "PNU"])?.toString() ?? null);
-          void refreshCadastralData(pickedId, true);
-        };
-
-        map.on("click", CADASTRAL_HIT_LAYER_ID, handleParcelClick);
-        map.on("click", CADASTRAL_LINE_LAYER_ID, handleParcelClick);
-        map.on("click", CADASTRAL_LINE_ACTIVE_LAYER_ID, handleParcelClick);
-
-        void refreshCadastralData();
+        void refreshCadastralDataRef.current(true);
         setIsMapReady(true);
       });
 
@@ -514,11 +650,33 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       if (debounceTimerRef.current !== null) {
         window.clearTimeout(debounceTimerRef.current);
       }
+
       pendingFetchRef.current?.abort();
       pendingParcelAreaFetchRef.current?.abort();
       mapRef.current?.remove();
       mapRef.current = null;
       setIsMapReady(false);
+    };
+  }, []);
+
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const preventContextMenu = (event: MouseEvent) => {
+      if (!drawModeRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+    };
+
+    container.addEventListener("contextmenu", preventContextMenu);
+
+    return () => {
+      container.removeEventListener("contextmenu", preventContextMenu);
     };
   }, []);
 
@@ -534,6 +692,53 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       styleType === "satellite" ? "visible" : "none"
     );
   }, [isMapReady, styleType]);
+
+  useEffect(() => {
+    const pendingNavigation = mapSearchState.pendingNavigation;
+    if (!isMapReady || !mapRef.current || !pendingNavigation) {
+      return;
+    }
+
+    mapRef.current.flyTo({
+      center: pendingNavigation.center,
+      zoom: pendingNavigation.zoom,
+      essential: true,
+      duration: 1200
+    });
+    consumePendingNavigation(pendingNavigation.id);
+  }, [consumePendingNavigation, isMapReady, mapSearchState.pendingNavigation]);
+
+  useEffect(() => {
+    if (!isMapReady) {
+      return;
+    }
+
+    setGeoJsonSourceData(mapRef.current, CADASTRAL_SOURCE_ID, decoratedVisibleFeatures);
+  }, [decoratedVisibleFeatures, isMapReady]);
+
+  useEffect(() => {
+    if (!isMapReady) {
+      return;
+    }
+
+    setGeoJsonSourceData(mapRef.current, ZONE_DRAFT_GEOMETRY_SOURCE_ID, draftGeometryCollection);
+  }, [draftGeometryCollection, isMapReady]);
+
+  useEffect(() => {
+    if (!isMapReady) {
+      return;
+    }
+
+    setGeoJsonSourceData(mapRef.current, ZONE_DRAFT_VERTEX_SOURCE_ID, draftVertexCollection);
+  }, [draftVertexCollection, isMapReady]);
+
+  useEffect(() => {
+    if (!isMapReady) {
+      return;
+    }
+
+    setGeoJsonSourceData(mapRef.current, ZONE_CONFIRMED_SOURCE_ID, confirmedZoneCollection);
+  }, [confirmedZoneCollection, isMapReady]);
 
   if (!isMapRenderable) {
     return <MapEnvGuardNotice mode="2d" />;
@@ -554,7 +759,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
                 : "bg-transparent text-slate-600 hover:bg-slate-100"
             }`}
           >
-            그림지도
+            일반지도
           </button>
           <button
             type="button"
@@ -572,21 +777,14 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
       {dataApiNotice ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
-          <p className="font-semibold">지적도 조회 안내</p>
-          <p className="mt-1 break-words">{dataApiNotice}</p>
-        </div>
-      ) : null}
-
-      {dataApiNotice ? (
-        <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-amber-200 bg-white/95 p-3 text-[11px] text-amber-700 shadow-sm backdrop-blur">
-          <p className="font-semibold">지적도 조회 안내</p>
+          <p className="font-semibold">지적 조회 안내</p>
           <p className="mt-1 break-words">{dataApiNotice}</p>
         </div>
       ) : null}
 
       {dataApiError ? (
         <div className="absolute left-6 top-[110px] z-10 max-w-[360px] rounded-xl border border-rose-200 bg-white/95 p-3 text-[11px] text-rose-700 shadow-sm backdrop-blur">
-          <p className="font-semibold">지적도 조회 오류</p>
+          <p className="font-semibold">지적 조회 오류</p>
           <p className="mt-1 break-words">{dataApiError}</p>
         </div>
       ) : null}
@@ -604,7 +802,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
               <span className="text-right text-slate-700">{selectedParcelAreaDisplay}</span>
             </div>
             <div className="flex items-start justify-between gap-4">
-              <span className="shrink-0 text-slate-500">개별공시지가(원/㎡)</span>
+              <span className="shrink-0 text-slate-500">개별공시지가</span>
               <span className="text-right text-slate-700">{selectedParcelJiga}</span>
             </div>
           </div>

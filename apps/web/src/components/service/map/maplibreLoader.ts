@@ -2,6 +2,7 @@ export type MapLibreMap = {
   addControl: (control: unknown, position?: string) => void;
   addLayer: (layer: Record<string, unknown>) => void;
   addSource: (id: string, source: Record<string, unknown>) => void;
+  flyTo: (options: { center: [number, number]; zoom?: number; essential?: boolean; duration?: number }) => void;
   getBounds: () => {
     getWest: () => number;
     getSouth: () => number;
@@ -14,6 +15,14 @@ export type MapLibreMap = {
       }
     | undefined;
   on: (...args: unknown[]) => void;
+  project: (lngLat: { lng: number; lat: number } | [number, number]) => {
+    x: number;
+    y: number;
+  };
+  queryRenderedFeatures: (geometryOrPoint?: unknown, options?: { layers?: string[] }) => Array<{
+    geometry?: unknown;
+    properties?: Record<string, unknown>;
+  }>;
   remove: () => void;
   setLayoutProperty: (layerId: string, name: string, value: string) => void;
 };

@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@turf/turf": "^7.3.5",
     "framer-motion": "^11.18.2",
     "next": "15.3.8",
     "react": "19.1.0",
