@@ -3,14 +3,21 @@
 import { type FormEvent, useState } from "react";
 import { motion } from "framer-motion";
 import { useLandRegister } from "@/components/service/map/analysis/landRegisterState";
+import { useSiteAnalysis, type SiteAnalysisSection } from "@/components/service/map/analysis/siteAnalysisState";
 import { useMapSearch } from "@/components/service/map/search/mapSearchState";
 import { useZoneSelectionPanel } from "@/components/service/map/zone-selection/useZoneSelectionPanel";
+
+const siteAnalysisActions: Array<{ section: SiteAnalysisSection; label: string; disabled?: boolean }> = [
+  { section: "basic", label: "기본정보" },
+  { section: "locationAnalysis", label: "입지분석", disabled: true }
+];
 
 export function CollapsiblePanel() {
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { state: searchState, submitSearch } = useMapSearch();
   const { canRequest: canRequestLandRegister, openLandRegister } = useLandRegister();
+  const { activeSection, canOpen: canOpenSiteAnalysis, openSection } = useSiteAnalysis();
   const {
     modeBadgeLabel,
     detailLabel,
@@ -217,10 +224,36 @@ export function CollapsiblePanel() {
             ) : null}
 
             <section className="flex flex-1 flex-col gap-3 rounded-2xl border border-stroke bg-white p-4">
-              <p className="text-sm text-slate-500">레이어 / 도구 자리</p>
-              <div className="h-16 rounded-xl border border-dashed border-slate-300 bg-slate-50" />
-              <div className="h-16 rounded-xl border border-dashed border-slate-300 bg-slate-50" />
-              <div className="h-16 rounded-xl border border-dashed border-slate-300 bg-slate-50" />
+              <p className="text-sm font-semibold text-slate-700">Site Analysis</p>
+
+              {canOpenSiteAnalysis ? (
+                <div className="flex flex-col gap-2">
+                  {siteAnalysisActions.map((action) => {
+                    const isActive = activeSection === action.section;
+
+                    return (
+                      <button
+                        key={action.section}
+                        type="button"
+                        onClick={() => openSection(action.section)}
+                        disabled={action.disabled}
+                        className={`flex h-10 items-center justify-between rounded-xl border border-dashed px-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isActive
+                            ? "border-slate-700 bg-slate-900 text-white"
+                            : "border-slate-300 bg-slate-50 text-slate-600 hover:bg-white"
+                        }`}
+                      >
+                        <span>{action.label}</span>
+                        {action.disabled ? <span className="text-[10px] font-semibold">준비중</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-[12px] text-slate-500">
+                  구역 확정 후 분석 도구가 표시됩니다.
+                </p>
+              )}
             </section>
           </div>
         ) : (

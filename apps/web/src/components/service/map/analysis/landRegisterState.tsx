@@ -24,6 +24,7 @@ type LandRegisterState = {
 
 type LandRegisterContextValue = LandRegisterState & {
   canRequest: boolean;
+  loadLandRegister: () => Promise<void>;
   openLandRegister: () => Promise<void>;
   closeLandRegister: () => void;
 };
@@ -54,10 +55,10 @@ export function LandRegisterProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const openLandRegister = useCallback(async () => {
+  const requestLandRegister = useCallback(async (openOverlay: boolean) => {
     if (zoneState.status !== "confirmed" || !zoneState.confirmedZone) {
       setState({
-        isOpen: true,
+        isOpen: openOverlay,
         status: "error",
         data: null,
         error: "확정된 구역이 없습니다. 구역을 먼저 확정해 주세요."
@@ -69,12 +70,12 @@ export function LandRegisterProvider({ children }: { children: ReactNode }) {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    setState({
-      isOpen: true,
+    setState((prev) => ({
+      isOpen: openOverlay ? true : prev.isOpen,
       status: "loading",
       data: null,
       error: null
-    });
+    }));
 
     try {
       const response = await fetch("/analysis/land-register", {
@@ -94,29 +95,37 @@ export function LandRegisterProvider({ children }: { children: ReactNode }) {
       }
 
       const data = (await response.json()) as LandRegisterResponse;
-      setState({
-        isOpen: true,
+      setState((prev) => ({
+        isOpen: openOverlay ? true : prev.isOpen,
         status: "success",
         data,
         error: null
-      });
+      }));
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
 
-      setState({
-        isOpen: true,
+      setState((prev) => ({
+        isOpen: openOverlay ? true : prev.isOpen,
         status: "error",
         data: null,
         error: error instanceof Error ? error.message : "토지조서 요청 중 오류가 발생했습니다."
-      });
+      }));
     } finally {
       if (abortControllerRef.current === abortController) {
         abortControllerRef.current = null;
       }
     }
   }, [zoneState.confirmedZone, zoneState.status]);
+
+  const loadLandRegister = useCallback(async () => {
+    await requestLandRegister(false);
+  }, [requestLandRegister]);
+
+  const openLandRegister = useCallback(async () => {
+    await requestLandRegister(true);
+  }, [requestLandRegister]);
 
   useEffect(() => {
     if (canRequest) {
@@ -138,10 +147,11 @@ export function LandRegisterProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       canRequest,
+      loadLandRegister,
       openLandRegister,
       closeLandRegister
     }),
-    [canRequest, closeLandRegister, openLandRegister, state]
+    [canRequest, closeLandRegister, loadLandRegister, openLandRegister, state]
   );
 
   return <LandRegisterContext.Provider value={value}>{children}</LandRegisterContext.Provider>;

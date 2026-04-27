@@ -25,6 +25,8 @@ import {
   ZONE_DRAFT_VERTEX_SOURCE_ID
 } from "./zone-selection/zoneSelectionMapLayers";
 import { useMapSearch } from "./search/mapSearchState";
+import { SiteAnalysisDetailPanel } from "./analysis/SiteAnalysisDetailPanel";
+import { SiteAnalysisOverlay } from "./analysis/SiteAnalysisOverlay";
 import { createEmptyFeatureCollection } from "./zone-selection/zoneSelectionGeometry";
 import { useZoneSelectionMap } from "./zone-selection/useZoneSelectionMap";
 import type { CadastralFeatureCollection, ParcelProps, ZoneGeometry } from "./zone-selection/zoneSelectionTypes";
@@ -749,29 +751,33 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       <div ref={mapContainerRef} className="h-full w-full" />
 
       {showStyleSelector ? (
-        <div className="absolute left-6 top-[55px] z-10 flex w-[154px] items-center gap-1 rounded-[14px] border border-slate-200 bg-white/92 p-[2px] shadow-sm backdrop-blur">
-          <button
-            type="button"
-            onClick={() => setStyleType("road")}
-            className={`flex-1 rounded-full px-3 py-0.5 text-[11px] font-semibold leading-5 transition ${
-              styleType === "road"
-                ? "bg-slate-900 text-white"
-                : "bg-transparent text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            일반지도
-          </button>
-          <button
-            type="button"
-            onClick={() => setStyleType("satellite")}
-            className={`flex-1 rounded-full px-3 py-0.5 text-[11px] font-semibold leading-5 transition ${
-              styleType === "satellite"
-                ? "bg-slate-900 text-white"
-                : "bg-transparent text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            위성지도
-          </button>
+        <div className="absolute left-6 top-[55px] z-10 flex flex-col gap-[5px]">
+          <div className="flex w-[154px] items-center gap-1 rounded-[14px] border border-slate-200 bg-white/92 p-[2px] shadow-sm backdrop-blur">
+            <button
+              type="button"
+              onClick={() => setStyleType("road")}
+              className={`flex-1 rounded-full px-3 py-0.5 text-[11px] font-semibold leading-5 transition ${
+                styleType === "road"
+                  ? "bg-slate-900 text-white"
+                  : "bg-transparent text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              일반지도
+            </button>
+            <button
+              type="button"
+              onClick={() => setStyleType("satellite")}
+              className={`flex-1 rounded-full px-3 py-0.5 text-[11px] font-semibold leading-5 transition ${
+                styleType === "satellite"
+                  ? "bg-slate-900 text-white"
+                  : "bg-transparent text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              위성지도
+            </button>
+          </div>
+
+          <SiteAnalysisOverlay />
         </div>
       ) : null}
 
@@ -814,6 +820,8 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
           Referrer: {mapPublicEnv.vworldReferrer}
         </p>
       ) : null}
+
+      <SiteAnalysisDetailPanel />
     </div>
   );
 }
