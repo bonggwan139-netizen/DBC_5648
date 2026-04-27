@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LandRegisterOverlay } from "@/components/service/map/analysis/LandRegisterOverlay";
 import { Map2DView } from "@/components/service/map/Map2DView";
 import { Map3DView } from "@/components/service/map/Map3DView";
 import { MapModeSwitch } from "@/components/service/map/MapModeSwitch";
@@ -30,6 +31,7 @@ export function MapView() {
     <div className="relative h-full w-full">
       {mode === "map2d" ? <Map2DView showStyleSelector={show2DStyles} /> : <Map3DView />}
       <MapModeSwitch mode={mode} onChange={handleModeChange} />
+      <LandRegisterOverlay />
     </div>
   );
 }

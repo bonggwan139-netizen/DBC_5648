@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { motion } from "framer-motion";
+import { useLandRegister } from "@/components/service/map/analysis/landRegisterState";
 import { useMapSearch } from "@/components/service/map/search/mapSearchState";
 import { useZoneSelectionPanel } from "@/components/service/map/zone-selection/useZoneSelectionPanel";
 
@@ -9,6 +10,7 @@ export function CollapsiblePanel() {
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { state: searchState, submitSearch } = useMapSearch();
+  const { canRequest: canRequestLandRegister, openLandRegister } = useLandRegister();
   const {
     modeBadgeLabel,
     detailLabel,
@@ -192,6 +194,27 @@ export function CollapsiblePanel() {
                 {feedback ? <p className="mt-2 text-[11px] text-rose-600">{feedback}</p> : null}
               </div>
             </section>
+
+            {canRequestLandRegister ? (
+              <section className="rounded-2xl border border-stroke bg-white p-4">
+                <button
+                  type="button"
+                  onClick={openLandRegister}
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                >
+                  <span>토지조서</span>
+                  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden="true">
+                    <path
+                      d="M7.5 4.5 12.5 10l-5 5.5"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </section>
+            ) : null}
 
             <section className="flex flex-1 flex-col gap-3 rounded-2xl border border-stroke bg-white p-4">
               <p className="text-sm text-slate-500">레이어 / 도구 자리</p>
