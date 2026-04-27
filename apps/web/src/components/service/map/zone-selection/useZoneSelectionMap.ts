@@ -7,7 +7,8 @@ import { CADASTRAL_HIT_LAYER_ID } from "../cadastralLayerStyle";
 import type { MapLibreMap } from "../maplibreLoader";
 import {
   createConfirmedZoneFeatureCollection,
-  createDrawDraftGeometryFeatureCollectionWithPreview,
+  createDraftUnionGeometryFeatureCollection,
+  createDrawDraftGuideFeatureCollectionWithPreview,
   createDrawDraftVertexFeatureCollection
 } from "./zoneSelectionGeometry";
 import { useZoneSelection } from "./zoneSelectionState";
@@ -18,7 +19,8 @@ import type {
   DrawVertex,
   MapPoint,
   ParcelFeatureRecord,
-  ParcelProps
+  ParcelProps,
+  ZoneDraftGeometryFeatureCollection
 } from "./zoneSelectionTypes";
 
 type MapClickEvent = {
@@ -235,12 +237,37 @@ export function useZoneSelectionMap(params: {
     [decoratedVisibleFeatures.features]
   );
 
-  const draftGeometryCollection = useMemo(
+  const selectedParcelRecords = useMemo(
     () =>
-      createDrawDraftGeometryFeatureCollectionWithPreview(state.draft.drawnGeometries, state.draft.drawVertices, {
+      state.draft.selectedParcelIds
+        .map((parcelId) => state.draft.parcelsById[parcelId])
+        .filter((record): record is ParcelFeatureRecord => Boolean(record)),
+    [state.draft.parcelsById, state.draft.selectedParcelIds]
+  );
+
+  const draftUnionGeometryCollection = useMemo(
+    () =>
+      createDraftUnionGeometryFeatureCollection({
+        parcelRecords: selectedParcelRecords,
+        drawnGeometries: state.draft.drawnGeometries
+      }),
+    [selectedParcelRecords, state.draft.drawnGeometries]
+  );
+
+  const drawGuideGeometryCollection = useMemo(
+    () =>
+      createDrawDraftGuideFeatureCollectionWithPreview(state.draft.drawVertices, {
         hoverCoordinate
       }),
-    [hoverCoordinate, state.draft.drawVertices, state.draft.drawnGeometries]
+    [hoverCoordinate, state.draft.drawVertices]
+  );
+
+  const draftGeometryCollection = useMemo<ZoneDraftGeometryFeatureCollection>(
+    () => ({
+      type: "FeatureCollection",
+      features: [...draftUnionGeometryCollection.features, ...drawGuideGeometryCollection.features]
+    }),
+    [draftUnionGeometryCollection, drawGuideGeometryCollection]
   );
 
   const draftVertexCollection = useMemo(

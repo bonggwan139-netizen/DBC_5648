@@ -75,7 +75,7 @@ export type ZoneSelectionState = {
 export type ZoneDraftGeometryFeatureCollection = FeatureCollection<
   Geometry,
   {
-    kind: "line" | "polygon" | "preview";
+    kind: "draft-union" | "line" | "preview";
   }
 >;
 

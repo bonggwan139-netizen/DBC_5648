@@ -68,8 +68,9 @@ export function addCadastralLayers(map: MapLibreMap) {
     source: CADASTRAL_SOURCE_ID,
     minzoom: 14,
     paint: {
-      "fill-color": "#0f766e",
-      "fill-opacity": 0.2
+      "fill-color": "#dc2626",
+      "fill-opacity": 0,
+      "fill-outline-color": "#dc2626"
     },
     filter: ["==", ["get", "_zone_selected"], true]
   });
@@ -80,8 +81,9 @@ export function addCadastralLayers(map: MapLibreMap) {
     source: CADASTRAL_SOURCE_ID,
     minzoom: 14,
     paint: {
-      "line-color": "#0f766e",
-      "line-width": 2.2
+      "line-color": "#dc2626",
+      "line-width": 2.2,
+      "line-opacity": 0
     },
     filter: ["==", ["get", "_zone_selected"], true]
   });

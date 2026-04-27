@@ -174,16 +174,35 @@ export function createFinalizedDraftZone(params: {
   );
 }
 
-export function createDrawDraftGeometryFeatureCollectionWithPreview(
-  drawnGeometries: DrawGeometryRecord[],
+export function createDraftUnionGeometryFeatureCollection(params: {
+  parcelRecords: ParcelFeatureRecord[];
+  drawnGeometries: DrawGeometryRecord[];
+}): ZoneDraftGeometryFeatureCollection {
+  const parcelGeometries = params.parcelRecords.map((record) => record.geometry);
+  const drawnGeometries = params.drawnGeometries.map((record) => record.geometry);
+
+  try {
+    const merged = mergeZoneGeometries([...parcelGeometries, ...drawnGeometries]);
+    if (!merged) {
+      return createEmptyFeatureCollection();
+    }
+
+    return {
+      type: "FeatureCollection",
+      features: [createFeature(merged, { kind: "draft-union" })]
+    };
+  } catch {
+    return createEmptyFeatureCollection();
+  }
+}
+
+export function createDrawDraftGuideFeatureCollectionWithPreview(
   vertices: DrawVertex[],
   options?: {
     hoverCoordinate?: Position | null;
   }
 ): ZoneDraftGeometryFeatureCollection {
-  const features: ZoneDraftGeometryFeatureCollection["features"] = drawnGeometries.map((record) =>
-    createFeature(record.geometry, { kind: "polygon" })
-  );
+  const features: ZoneDraftGeometryFeatureCollection["features"] = [];
 
   if (vertices.length >= 2) {
     const lineGeometry: LineString = {

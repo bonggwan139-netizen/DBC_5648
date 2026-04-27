@@ -28,10 +28,11 @@ export function addZoneSelectionOverlayLayers(map: MapLibreMap) {
     type: "fill",
     source: ZONE_DRAFT_GEOMETRY_SOURCE_ID,
     paint: {
-      "fill-color": "#0f766e",
-      "fill-opacity": 0.16
+      "fill-color": "#dc2626",
+      "fill-opacity": 0.14,
+      "fill-outline-color": "#dc2626"
     },
-    filter: ["==", ["get", "kind"], "polygon"]
+    filter: ["==", ["get", "kind"], "draft-union"]
   });
 
   map.addLayer({
@@ -39,9 +40,9 @@ export function addZoneSelectionOverlayLayers(map: MapLibreMap) {
     type: "line",
     source: ZONE_DRAFT_GEOMETRY_SOURCE_ID,
     paint: {
-      "line-color": "#0f766e",
+      "line-color": "#dc2626",
       "line-width": 2,
-      "line-dasharray": [2, 2]
+      "line-opacity": 0.9
     },
     filter: ["==", ["get", "kind"], "line"]
   });
@@ -51,9 +52,9 @@ export function addZoneSelectionOverlayLayers(map: MapLibreMap) {
     type: "line",
     source: ZONE_DRAFT_GEOMETRY_SOURCE_ID,
     paint: {
-      "line-color": "#0f766e",
-      "line-width": 1.5,
-      "line-dasharray": [1, 2]
+      "line-color": "#dc2626",
+      "line-width": 1.25,
+      "line-opacity": 0.8
     },
     filter: ["==", ["get", "kind"], "preview"]
   });
@@ -66,7 +67,7 @@ export function addZoneSelectionOverlayLayers(map: MapLibreMap) {
       "circle-radius": 4,
       "circle-color": "#ffffff",
       "circle-stroke-width": 2,
-      "circle-stroke-color": "#0f766e"
+      "circle-stroke-color": "#dc2626"
     }
   });
 
@@ -75,8 +76,8 @@ export function addZoneSelectionOverlayLayers(map: MapLibreMap) {
     type: "fill",
     source: ZONE_CONFIRMED_SOURCE_ID,
     paint: {
-      "fill-color": "#0f172a",
-      "fill-opacity": 0.14
+      "fill-color": "#dc2626",
+      "fill-opacity": 0
     }
   });
 
@@ -84,9 +85,14 @@ export function addZoneSelectionOverlayLayers(map: MapLibreMap) {
     id: "zone-confirmed-line",
     type: "line",
     source: ZONE_CONFIRMED_SOURCE_ID,
+    layout: {
+      "line-cap": "round",
+      "line-join": "round"
+    },
     paint: {
-      "line-color": "#0f172a",
-      "line-width": 2.5
+      "line-color": "#dc2626",
+      "line-width": 3.5,
+      "line-dasharray": [4, 1.5, 0.6, 1.5]
     }
   });
 }
