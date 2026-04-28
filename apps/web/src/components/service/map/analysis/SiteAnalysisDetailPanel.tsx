@@ -172,7 +172,7 @@ export function SiteAnalysisDetailPanel() {
     >
       <button
         type="button"
-        aria-label={collapsed ? "위치정보 패널 펼치기" : "위치정보 패널 접기"}
+        aria-label={collapsed ? `${panelTitle} 패널 펼치기` : `${panelTitle} 패널 접기`}
         onClick={() => setCollapsed((prev) => !prev)}
         className="absolute -left-[14px] top-1/2 z-10 flex h-12 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
       >
@@ -387,7 +387,7 @@ function LandCategoryPieChart({
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-5">
-        <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" role="img" aria-label="지목현황 구성비 차트">
+        <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" role="img" aria-label="구성비 차트">
           <circle cx="60" cy="60" r="42" fill="#f8fafc" />
           {rows.map((row, index) => {
             const ratio =
