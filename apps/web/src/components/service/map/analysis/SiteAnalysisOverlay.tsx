@@ -22,7 +22,9 @@ const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
     items: [
       { label: "지목현황", detailItem: "basicLandCategory" },
       { label: "소유현황", detailItem: "basicOwnership" },
-      ...["면적현황", "공시지가", "토지형상", "접도구분"].map((label) => ({ label }))
+      { label: "면적현황", detailItem: "basicAreaSummary" },
+      { label: "공시지가", detailItem: "basicOfficialPrice" },
+      ...["토지형상", "접도구분"].map((label) => ({ label }))
     ]
   },
   {

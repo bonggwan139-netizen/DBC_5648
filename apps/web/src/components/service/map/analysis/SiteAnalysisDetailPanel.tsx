@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLandRegister } from "./landRegisterState";
+import { useSiteAnalysisAreaSummary } from "./siteAnalysisAreaSummary";
 import {
   type BasicInfoAnalysisRow,
   useSiteAnalysisLandCategory
 } from "./siteAnalysisLandCategory";
 import { buildSiteAnalysisLocationRows } from "./siteAnalysisLocation";
+import { useSiteAnalysisOfficialPrice } from "./siteAnalysisOfficialPrice";
 import { useSiteAnalysisOwnership } from "./siteAnalysisOwnership";
 import { useSiteAnalysis } from "./siteAnalysisState";
 
@@ -20,6 +22,38 @@ const landCategoryNoticeLines = [
   "※ 면적은 확정 구역과 필지가 실제 겹치는 구적면적 기준입니다.",
   "※ 구역계 면적은 확정 구역 전체 면적, 계는 지목별 면적 합계, 면적오차는 두 값의 차이입니다."
 ];
+const ownershipNoticeLines = [
+  "※ 면적은 확정 구역과 필지가 실제 겹치는 구적면적 기준입니다.",
+  "※ 구역계 면적은 확정 구역 전체 면적, 계는 소유별 면적 합계, 면적오차는 두 값의 차이입니다."
+];
+const areaSummaryNoticeLines = [
+  "※ 면적은 확정 구역과 필지가 실제 겹치는 구적면적 기준입니다.",
+  "※ 구역계 면적은 확정 구역 전체 면적, 계는 면적별 면적 합계, 면적오차는 두 값의 차이입니다.",
+  "※ 면적 구간은 서비스 초기 고정 기준이며, 추후 데이터 확대에 따라 조정될 수 있습니다."
+];
+const officialPriceNoticeLines = [
+  "※ 면적은 확정 구역과 필지가 실제 겹치는 구적면적 기준입니다.",
+  "※ 구역계 면적은 확정 구역 전체 면적, 계는 공시지가별 면적 합계, 면적오차는 두 값의 차이입니다.",
+  "※ 공시지가 구간은 서비스 초기 고정 기준이며, 추후 데이터 확대에 따라 조정될 수 있습니다."
+];
+const areaSummaryColorOverrides: Record<string, string> = {
+  "area_range:unknown": "#CBD5E1",
+  "area_range:under_100": "#DBEAFE",
+  "area_range:100_300": "#BFDBFE",
+  "area_range:300_1000": "#93C5FD",
+  "area_range:1000_3000": "#60A5FA",
+  "area_range:3000_10000": "#3B82F6",
+  "area_range:over_10000": "#2563EB"
+};
+const officialPriceColorOverrides: Record<string, string> = {
+  "official_price_range:unknown": "#CBD5E1",
+  "official_price_range:under_100000": "#DBEAFE",
+  "official_price_range:100000_500000": "#BFDBFE",
+  "official_price_range:500000_1000000": "#93C5FD",
+  "official_price_range:1000000_3000000": "#60A5FA",
+  "official_price_range:3000000_10000000": "#3B82F6",
+  "official_price_range:over_10000000": "#2563EB"
+};
 
 function formatArea(value: number) {
   return `${areaFormatter.format(value)}㎡`;
@@ -33,8 +67,12 @@ function formatParcelCount(value: number | null) {
   return value === null ? "-" : countFormatter.format(value);
 }
 
-function getRowColor(row: BasicInfoAnalysisRow, index: number) {
-  return row.color ?? pastelFallbacks[index % pastelFallbacks.length];
+function getRowColor(row: BasicInfoAnalysisRow, index: number, colorOverrides?: Record<string, string>) {
+  return colorOverrides?.[row.key] ?? row.color ?? pastelFallbacks[index % pastelFallbacks.length];
+}
+
+function getTableRowColor(row: BasicInfoAnalysisRow, colorOverrides?: Record<string, string>) {
+  return colorOverrides?.[row.key] ?? row.color;
 }
 
 function getLandCategoryCellClass(row: BasicInfoAnalysisRow, className = "") {
@@ -67,6 +105,20 @@ export function SiteAnalysisDetailPanel() {
     loadOwnership,
     status: ownershipStatus
   } = useSiteAnalysisOwnership();
+  const {
+    canRequest: canRequestAreaSummary,
+    data: areaSummaryData,
+    error: areaSummaryError,
+    loadAreaSummary,
+    status: areaSummaryStatus
+  } = useSiteAnalysisAreaSummary();
+  const {
+    canRequest: canRequestOfficialPrice,
+    data: officialPriceData,
+    error: officialPriceError,
+    loadOfficialPrice,
+    status: officialPriceStatus
+  } = useSiteAnalysisOfficialPrice();
   const [collapsed, setCollapsed] = useState(false);
   const locationRows = buildSiteAnalysisLocationRows(data);
 
@@ -93,6 +145,18 @@ export function SiteAnalysisDetailPanel() {
       void loadOwnership();
     }
   }, [activeDetailItem, canRequestOwnership, loadOwnership, ownershipStatus]);
+
+  useEffect(() => {
+    if (canRequestAreaSummary && activeDetailItem === "basicAreaSummary" && areaSummaryStatus === "idle") {
+      void loadAreaSummary();
+    }
+  }, [activeDetailItem, areaSummaryStatus, canRequestAreaSummary, loadAreaSummary]);
+
+  useEffect(() => {
+    if (canRequestOfficialPrice && activeDetailItem === "basicOfficialPrice" && officialPriceStatus === "idle") {
+      void loadOfficialPrice();
+    }
+  }, [activeDetailItem, canRequestOfficialPrice, loadOfficialPrice, officialPriceStatus]);
 
   if (!canOpen || !activeDetailItem) {
     return null;
@@ -138,9 +202,31 @@ export function SiteAnalysisDetailPanel() {
               emptyMessage="분석 결과에서 소유현황을 찾을 수 없습니다."
               error={ownershipError}
               loadingMessage="소유현황을 불러오는 중입니다."
-              noticeLines={landCategoryNoticeLines}
+              noticeLines={ownershipNoticeLines}
               status={ownershipStatus}
               title="소유현황"
+            />
+          ) : activeDetailItem === "basicAreaSummary" ? (
+            <CategoryAnalysisContent
+              data={areaSummaryData}
+              emptyMessage="분석 결과에서 면적현황을 찾을 수 없습니다."
+              error={areaSummaryError}
+              loadingMessage="면적현황을 불러오는 중입니다."
+              noticeLines={areaSummaryNoticeLines}
+              colorOverrides={areaSummaryColorOverrides}
+              status={areaSummaryStatus}
+              title="면적현황"
+            />
+          ) : activeDetailItem === "basicOfficialPrice" ? (
+            <CategoryAnalysisContent
+              data={officialPriceData}
+              emptyMessage="분석 결과에서 공시지가현황을 찾을 수 없습니다."
+              error={officialPriceError}
+              loadingMessage="공시지가현황을 불러오는 중입니다."
+              noticeLines={officialPriceNoticeLines}
+              colorOverrides={officialPriceColorOverrides}
+              status={officialPriceStatus}
+              title="공시지가"
             />
           ) : (
             <CategoryAnalysisContent
@@ -219,6 +305,7 @@ function LocationInfoContent({
 }
 
 function CategoryAnalysisContent({
+  colorOverrides,
   data,
   emptyMessage,
   error,
@@ -227,6 +314,7 @@ function CategoryAnalysisContent({
   status,
   title
 }: {
+  colorOverrides?: Record<string, string>;
   data: { table_rows: BasicInfoAnalysisRow[]; chart_rows: BasicInfoAnalysisRow[] } | null;
   emptyMessage: string;
   error: string | null;
@@ -258,8 +346,12 @@ function CategoryAnalysisContent({
 
       {status === "success" && data && data.table_rows.length > 0 ? (
         <div className="mt-4 flex flex-col gap-4">
-          <LandCategoryPieChart emptyMessage={emptyMessage} rows={data.chart_rows.filter((row) => row.row_type === "category")} />
-          <LandCategoryTable rows={data.table_rows} />
+          <LandCategoryPieChart
+            colorOverrides={colorOverrides}
+            emptyMessage={emptyMessage}
+            rows={data.chart_rows.filter((row) => row.row_type === "category")}
+          />
+          <LandCategoryTable colorOverrides={colorOverrides} rows={data.table_rows} />
         </div>
       ) : null}
 
@@ -272,7 +364,15 @@ function CategoryAnalysisContent({
   );
 }
 
-function LandCategoryPieChart({ emptyMessage, rows }: { emptyMessage: string; rows: BasicInfoAnalysisRow[] }) {
+function LandCategoryPieChart({
+  colorOverrides,
+  emptyMessage,
+  rows
+}: {
+  colorOverrides?: Record<string, string>;
+  emptyMessage: string;
+  rows: BasicInfoAnalysisRow[];
+}) {
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
@@ -306,7 +406,7 @@ function LandCategoryPieChart({ emptyMessage, rows }: { emptyMessage: string; ro
                 cy="60"
                 r="42"
                 fill="none"
-                stroke={getRowColor(row, index)}
+                stroke={getRowColor(row, index, colorOverrides)}
                 strokeDasharray={`${ratio} ${Math.max(100 - ratio, 0)}`}
                 strokeDashoffset={-dashOffset}
                 strokeWidth="24"
@@ -323,7 +423,7 @@ function LandCategoryPieChart({ emptyMessage, rows }: { emptyMessage: string; ro
             <div key={row.key} className="flex items-start gap-2 text-[12px] text-slate-600">
               <span
                 className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: getRowColor(row, index) }}
+                style={{ backgroundColor: getRowColor(row, index, colorOverrides) }}
               />
               <div className="min-w-0">
                 <p className="font-medium text-slate-800">{row.label}</p>
@@ -339,7 +439,13 @@ function LandCategoryPieChart({ emptyMessage, rows }: { emptyMessage: string; ro
   );
 }
 
-function LandCategoryTable({ rows }: { rows: BasicInfoAnalysisRow[] }) {
+function LandCategoryTable({
+  colorOverrides,
+  rows
+}: {
+  colorOverrides?: Record<string, string>;
+  rows: BasicInfoAnalysisRow[];
+}) {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200">
       <div className="max-h-[360px] overflow-auto">
@@ -355,11 +461,14 @@ function LandCategoryTable({ rows }: { rows: BasicInfoAnalysisRow[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
-            {rows.map((row) => (
+            {rows.map((row) => {
+              const color = getTableRowColor(row, colorOverrides);
+
+              return (
               <tr key={row.key}>
                 <td className={getLandCategoryCellClass(row, "px-3 py-2")}>
-                  {row.color ? (
-                    <span className="block h-3 w-3 rounded-full" style={{ backgroundColor: row.color }} />
+                  {color ? (
+                    <span className="block h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
                   ) : (
                     "-"
                   )}
@@ -370,7 +479,8 @@ function LandCategoryTable({ rows }: { rows: BasicInfoAnalysisRow[] }) {
                 <td className={getLandCategoryCellClass(row, "whitespace-nowrap px-3 py-2")}>{formatParcelCount(row.parcel_count)}</td>
                 <td className={getLandCategoryCellClass(row, "whitespace-nowrap px-3 py-2")}>{row.note ?? "-"}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
