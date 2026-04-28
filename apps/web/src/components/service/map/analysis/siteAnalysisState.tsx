@@ -5,7 +5,7 @@ import { useZoneSelection } from "@/components/service/map/zone-selection/zoneSe
 
 export type SiteAnalysisTopSection = "basic" | "locationAnalysis";
 export type SiteAnalysisSection = SiteAnalysisTopSection;
-export type SiteAnalysisDetailItem = "basicLocationInfo" | "basicLandCategory";
+export type SiteAnalysisDetailItem = "basicLocationInfo" | "basicLandCategory" | "basicOwnership";
 
 type SiteAnalysisContextValue = {
   activeSection: SiteAnalysisTopSection | null;

@@ -8,6 +8,7 @@ import {
   useSiteAnalysisLandCategory
 } from "./siteAnalysisLandCategory";
 import { buildSiteAnalysisLocationRows } from "./siteAnalysisLocation";
+import { useSiteAnalysisOwnership } from "./siteAnalysisOwnership";
 import { useSiteAnalysis } from "./siteAnalysisState";
 
 const areaFormatter = new Intl.NumberFormat("ko-KR", {
@@ -59,6 +60,13 @@ export function SiteAnalysisDetailPanel() {
     loadLandCategory,
     status: landCategoryStatus
   } = useSiteAnalysisLandCategory();
+  const {
+    canRequest: canRequestOwnership,
+    data: ownershipData,
+    error: ownershipError,
+    loadOwnership,
+    status: ownershipStatus
+  } = useSiteAnalysisOwnership();
   const [collapsed, setCollapsed] = useState(false);
   const locationRows = buildSiteAnalysisLocationRows(data);
 
@@ -80,11 +88,17 @@ export function SiteAnalysisDetailPanel() {
     }
   }, [activeDetailItem, canRequestLandCategory, landCategoryStatus, loadLandCategory]);
 
+  useEffect(() => {
+    if (canRequestOwnership && activeDetailItem === "basicOwnership" && ownershipStatus === "idle") {
+      void loadOwnership();
+    }
+  }, [activeDetailItem, canRequestOwnership, loadOwnership, ownershipStatus]);
+
   if (!canOpen || !activeDetailItem) {
     return null;
   }
 
-  const panelTitle = activeDetailItem === "basicLandCategory" ? "지목현황" : "위치정보";
+  const panelTitle = activeDetailItem === "basicLocationInfo" ? "위치정보" : "토지정보";
 
   return (
     <motion.aside
@@ -118,8 +132,26 @@ export function SiteAnalysisDetailPanel() {
 
           {activeDetailItem === "basicLocationInfo" ? (
             <LocationInfoContent error={error} locationRows={locationRows} status={status} />
+          ) : activeDetailItem === "basicOwnership" ? (
+            <CategoryAnalysisContent
+              data={ownershipData}
+              emptyMessage="분석 결과에서 소유현황을 찾을 수 없습니다."
+              error={ownershipError}
+              loadingMessage="소유현황을 불러오는 중입니다."
+              noticeLines={landCategoryNoticeLines}
+              status={ownershipStatus}
+              title="소유현황"
+            />
           ) : (
-            <LandCategoryContent data={landCategoryData} error={landCategoryError} status={landCategoryStatus} />
+            <CategoryAnalysisContent
+              data={landCategoryData}
+              emptyMessage="분석 결과에서 지목현황을 찾을 수 없습니다."
+              error={landCategoryError}
+              loadingMessage="지목현황을 불러오는 중입니다."
+              noticeLines={landCategoryNoticeLines}
+              status={landCategoryStatus}
+              title="지목현황"
+            />
           )}
         </div>
       ) : (
@@ -186,57 +218,65 @@ function LocationInfoContent({
   );
 }
 
-function LandCategoryContent({
+function CategoryAnalysisContent({
   data,
+  emptyMessage,
   error,
-  status
+  loadingMessage,
+  noticeLines,
+  status,
+  title
 }: {
   data: { table_rows: BasicInfoAnalysisRow[]; chart_rows: BasicInfoAnalysisRow[] } | null;
+  emptyMessage: string;
   error: string | null;
+  loadingMessage: string;
+  noticeLines: string[];
   status: "idle" | "loading" | "success" | "error";
+  title: string;
 }) {
   return (
     <section className="min-h-0 flex-1 overflow-y-auto pt-5 font-[family-name:var(--font-pretendard)]">
-      <h3 className="text-sm font-semibold text-slate-800">지목현황</h3>
+      <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
       <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-light leading-5 text-amber-800">
-        {landCategoryNoticeLines.map((line) => (
+        {noticeLines.map((line) => (
           <p key={line}>{line}</p>
         ))}
       </div>
 
       {status === "loading" ? (
         <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
-          지목현황을 불러오는 중입니다.
+          {loadingMessage}
         </p>
       ) : null}
 
       {status === "error" ? (
         <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-[12px] text-rose-700">
-          {error ?? "지목현황을 불러오지 못했습니다."}
+          {error ?? loadingMessage.replace("불러오는 중입니다.", "불러오지 못했습니다.")}
         </p>
       ) : null}
 
       {status === "success" && data && data.table_rows.length > 0 ? (
         <div className="mt-4 flex flex-col gap-4">
-          <LandCategoryPieChart rows={data.chart_rows.filter((row) => row.row_type === "category")} />
+          <LandCategoryPieChart emptyMessage={emptyMessage} rows={data.chart_rows.filter((row) => row.row_type === "category")} />
           <LandCategoryTable rows={data.table_rows} />
         </div>
       ) : null}
 
       {status === "success" && (!data || data.table_rows.length === 0) ? (
         <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
-          분석 결과에서 지목현황을 찾을 수 없습니다.
+          {emptyMessage}
         </p>
       ) : null}
     </section>
   );
 }
 
-function LandCategoryPieChart({ rows }: { rows: BasicInfoAnalysisRow[] }) {
+function LandCategoryPieChart({ emptyMessage, rows }: { emptyMessage: string; rows: BasicInfoAnalysisRow[] }) {
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
-        분석 결과에서 지목현황을 찾을 수 없습니다.
+        {emptyMessage}
       </p>
     );
   }
