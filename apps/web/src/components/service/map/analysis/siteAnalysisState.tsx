@@ -2,6 +2,7 @@
 
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useZoneSelection } from "@/components/service/map/zone-selection/zoneSelectionState";
+import type { SiteAnalysisMapFeatureCollection } from "./siteAnalysisMapFeatures";
 
 export type SiteAnalysisTopSection = "basic" | "locationAnalysis";
 export type SiteAnalysisSection = SiteAnalysisTopSection;
@@ -21,6 +22,8 @@ type SiteAnalysisContextValue = {
   openSection: (section: SiteAnalysisTopSection) => void;
   closeSection: () => void;
   openDetailItem: (item: SiteAnalysisDetailItem) => void;
+  activeThematicMapFeatures: SiteAnalysisMapFeatureCollection | null;
+  setActiveThematicMapFeatures: (features: SiteAnalysisMapFeatureCollection | null) => void;
 };
 
 const SiteAnalysisContext = createContext<SiteAnalysisContextValue | null>(null);
@@ -29,6 +32,7 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
   const { state: zoneState } = useZoneSelection();
   const [activeSection, setActiveSection] = useState<SiteAnalysisTopSection | null>(null);
   const [activeDetailItem, setActiveDetailItem] = useState<SiteAnalysisDetailItem | null>(null);
+  const [activeThematicMapFeatures, setActiveThematicMapFeatures] = useState<SiteAnalysisMapFeatureCollection | null>(null);
 
   const canOpen = zoneState.status === "confirmed" && zoneState.confirmedZone !== null;
 
@@ -66,6 +70,7 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
 
     setActiveSection(null);
     setActiveDetailItem(null);
+    setActiveThematicMapFeatures(null);
   }, [canOpen]);
 
   const value = useMemo<SiteAnalysisContextValue>(
@@ -75,9 +80,11 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
       canOpen,
       openSection,
       closeSection,
-      openDetailItem
+      openDetailItem,
+      activeThematicMapFeatures,
+      setActiveThematicMapFeatures
     }),
-    [activeDetailItem, activeSection, canOpen, closeSection, openDetailItem, openSection]
+    [activeDetailItem, activeSection, activeThematicMapFeatures, canOpen, closeSection, openDetailItem, openSection]
   );
 
   return <SiteAnalysisContext.Provider value={value}>{children}</SiteAnalysisContext.Provider>;

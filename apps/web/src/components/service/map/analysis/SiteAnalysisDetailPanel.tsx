@@ -45,53 +45,6 @@ const roadSideNoticeLines = [
   ...areaBasisNoticeLines,
   "※ 비접도는 세로한면(불), 세로각지(불), 맹지로 분류된 토지를 의미합니다."
 ];
-const areaSummaryColorOverrides: Record<string, string> = {
-  "area_range:unknown": "#CBD5E1",
-  "area_range:under_100": "#DBEAFE",
-  "area_range:100_300": "#BFDBFE",
-  "area_range:300_1000": "#93C5FD",
-  "area_range:1000_3000": "#60A5FA",
-  "area_range:3000_10000": "#3B82F6",
-  "area_range:over_10000": "#2563EB"
-};
-const officialPriceColorOverrides: Record<string, string> = {
-  "official_price_range:unknown": "#CBD5E1",
-  "official_price_range:under_100000": "#DBEAFE",
-  "official_price_range:100000_500000": "#BFDBFE",
-  "official_price_range:500000_1000000": "#93C5FD",
-  "official_price_range:1000000_3000000": "#60A5FA",
-  "official_price_range:3000000_10000000": "#3B82F6",
-  "official_price_range:over_10000000": "#2563EB"
-};
-const terrainShapeColorOverrides: Record<string, string> = {
-  "terrain_shape:가로장방": "#93C5FD",
-  "가로장방": "#93C5FD",
-  "terrain_shape:세로장방": "#F9A8D4",
-  "세로장방": "#F9A8D4",
-  "terrain_shape:정방형": "#86EFAC",
-  "정방형": "#86EFAC",
-  "terrain_shape:삼각형": "#FDE68A",
-  "삼각형": "#FDE68A",
-  "terrain_shape:역삼각": "#67E8F9",
-  "역삼각": "#67E8F9",
-  "terrain_shape:사다리형": "#FDBA74",
-  "사다리형": "#FDBA74",
-  "terrain_shape:자루형": "#C4B5FD",
-  "자루형": "#C4B5FD",
-  "terrain_shape:부정형": "#F0ABFC",
-  "부정형": "#F0ABFC",
-  "terrain_shape:지정되지않음": "#CBD5E1",
-  "지정되지않음": "#CBD5E1",
-  "terrain_shape:기타(값 없음 등)": "#CBD5E1",
-  "기타(값 없음 등)": "#CBD5E1",
-  "terrain_shape:unknown": "#CBD5E1",
-  "unknown": "#CBD5E1"
-};
-const roadSideColorOverrides: Record<string, string> = {
-  "road_side:access": "#0EA5E9",
-  "road_side:no_access": "#F97316",
-  "road_side:other": "#94A3B8"
-};
 
 function formatArea(value: number) {
   return `${areaFormatter.format(value)}㎡`;
@@ -105,12 +58,12 @@ function formatParcelCount(value: number | null) {
   return value === null ? "-" : countFormatter.format(value);
 }
 
-function getRowColor(row: BasicInfoAnalysisRow, index: number, colorOverrides?: Record<string, string>) {
-  return colorOverrides?.[row.key] ?? colorOverrides?.[row.label] ?? row.color ?? pastelFallbacks[index % pastelFallbacks.length];
+function getRowColor(row: BasicInfoAnalysisRow, index: number) {
+  return row.color ?? pastelFallbacks[index % pastelFallbacks.length];
 }
 
-function getTableRowColor(row: BasicInfoAnalysisRow, colorOverrides?: Record<string, string>) {
-  return colorOverrides?.[row.key] ?? colorOverrides?.[row.label] ?? row.color;
+function getTableRowColor(row: BasicInfoAnalysisRow) {
+  return row.color;
 }
 
 function getLandCategoryCellClass(row: BasicInfoAnalysisRow, className = "") {
@@ -127,7 +80,7 @@ function getLandCategoryCellClass(row: BasicInfoAnalysisRow, className = "") {
 }
 
 export function SiteAnalysisDetailPanel() {
-  const { activeDetailItem, canOpen } = useSiteAnalysis();
+  const { activeDetailItem, canOpen, setActiveThematicMapFeatures } = useSiteAnalysis();
   const { canRequest, data, error, loadLandRegister, status } = useLandRegister();
   const {
     canRequest: canRequestLandCategory,
@@ -222,6 +175,30 @@ export function SiteAnalysisDetailPanel() {
     }
   }, [activeDetailItem, canRequestRoadSide, loadRoadSide, roadSideStatus]);
 
+  const activeThematicMapFeatures =
+    activeDetailItem === "basicLandCategory"
+      ? landCategoryData?.map_features ?? null
+      : activeDetailItem === "basicOwnership"
+        ? ownershipData?.map_features ?? null
+        : activeDetailItem === "basicAreaSummary"
+          ? areaSummaryData?.map_features ?? null
+          : activeDetailItem === "basicOfficialPrice"
+            ? officialPriceData?.map_features ?? null
+            : activeDetailItem === "basicTerrainShape"
+              ? terrainShapeData?.map_features ?? null
+              : activeDetailItem === "basicRoadSide"
+                ? roadSideData?.map_features ?? null
+                : null;
+
+  useEffect(() => {
+    if (!canOpen || !activeDetailItem) {
+      setActiveThematicMapFeatures(null);
+      return;
+    }
+
+    setActiveThematicMapFeatures(activeThematicMapFeatures);
+  }, [activeDetailItem, activeThematicMapFeatures, canOpen, setActiveThematicMapFeatures]);
+
   if (!canOpen || !activeDetailItem) {
     return null;
   }
@@ -277,7 +254,6 @@ export function SiteAnalysisDetailPanel() {
               error={areaSummaryError}
               loadingMessage="면적현황을 불러오는 중입니다."
               noticeLines={areaSummaryNoticeLines}
-              colorOverrides={areaSummaryColorOverrides}
               status={areaSummaryStatus}
               title="면적현황"
             />
@@ -288,7 +264,6 @@ export function SiteAnalysisDetailPanel() {
               error={officialPriceError}
               loadingMessage="공시지가현황을 불러오는 중입니다."
               noticeLines={officialPriceNoticeLines}
-              colorOverrides={officialPriceColorOverrides}
               status={officialPriceStatus}
               title="공시지가"
             />
@@ -299,7 +274,6 @@ export function SiteAnalysisDetailPanel() {
               error={terrainShapeError}
               loadingMessage="토지형상을 불러오는 중입니다."
               noticeLines={terrainShapeNoticeLines}
-              colorOverrides={terrainShapeColorOverrides}
               status={terrainShapeStatus}
               title="토지형상"
             />
@@ -310,7 +284,6 @@ export function SiteAnalysisDetailPanel() {
               error={roadSideError}
               loadingMessage="접도구분을 불러오는 중입니다."
               noticeLines={roadSideNoticeLines}
-              colorOverrides={roadSideColorOverrides}
               status={roadSideStatus}
               title="접도구분"
             />
@@ -391,7 +364,6 @@ function LocationInfoContent({
 }
 
 function CategoryAnalysisContent({
-  colorOverrides,
   data,
   emptyMessage,
   error,
@@ -400,7 +372,6 @@ function CategoryAnalysisContent({
   status,
   title
 }: {
-  colorOverrides?: Record<string, string>;
   data: { table_rows: BasicInfoAnalysisRow[]; chart_rows: BasicInfoAnalysisRow[] } | null;
   emptyMessage: string;
   error: string | null;
@@ -433,11 +404,10 @@ function CategoryAnalysisContent({
       {status === "success" && data && data.table_rows.length > 0 ? (
         <div className="mt-4 flex flex-col gap-4">
           <LandCategoryPieChart
-            colorOverrides={colorOverrides}
             emptyMessage={emptyMessage}
             rows={data.chart_rows.filter((row) => row.row_type === "category")}
           />
-          <LandCategoryTable colorOverrides={colorOverrides} rows={data.table_rows} />
+          <LandCategoryTable rows={data.table_rows} />
         </div>
       ) : null}
 
@@ -451,11 +421,9 @@ function CategoryAnalysisContent({
 }
 
 function LandCategoryPieChart({
-  colorOverrides,
   emptyMessage,
   rows
 }: {
-  colorOverrides?: Record<string, string>;
   emptyMessage: string;
   rows: BasicInfoAnalysisRow[];
 }) {
@@ -492,7 +460,7 @@ function LandCategoryPieChart({
                 cy="60"
                 r="42"
                 fill="none"
-                stroke={getRowColor(row, index, colorOverrides)}
+                stroke={getRowColor(row, index)}
                 strokeDasharray={`${ratio} ${Math.max(100 - ratio, 0)}`}
                 strokeDashoffset={-dashOffset}
                 strokeWidth="24"
@@ -509,7 +477,7 @@ function LandCategoryPieChart({
             <div key={row.key} className="flex items-start gap-2 text-[12px] text-slate-600">
               <span
                 className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: getRowColor(row, index, colorOverrides) }}
+                style={{ backgroundColor: getRowColor(row, index) }}
               />
               <div className="min-w-0">
                 <p className="font-medium text-slate-800">{row.label}</p>
@@ -526,10 +494,8 @@ function LandCategoryPieChart({
 }
 
 function LandCategoryTable({
-  colorOverrides,
   rows
 }: {
-  colorOverrides?: Record<string, string>;
   rows: BasicInfoAnalysisRow[];
 }) {
   return (
@@ -548,7 +514,7 @@ function LandCategoryTable({
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
             {rows.map((row) => {
-              const color = getTableRowColor(row, colorOverrides);
+              const color = getTableRowColor(row);
 
               return (
               <tr key={row.key}>

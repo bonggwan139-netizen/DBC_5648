@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useZoneSelection } from "@/components/service/map/zone-selection/zoneSelectionState";
+import type { SiteAnalysisMapFeatureCollection } from "./siteAnalysisMapFeatures";
 
 export type BasicInfoRowType = "zone" | "error" | "total" | "category";
 
@@ -26,6 +27,7 @@ export type LandCategoryResponse = {
   };
   table_rows: BasicInfoAnalysisRow[];
   chart_rows: BasicInfoAnalysisRow[];
+  map_features: SiteAnalysisMapFeatureCollection;
 };
 
 type LandCategoryStatus = "idle" | "loading" | "success" | "error";

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useZoneSelection } from "@/components/service/map/zone-selection/zoneSelectionState";
 import type { BasicInfoAnalysisRow } from "./siteAnalysisLandCategory";
+import type { SiteAnalysisMapFeatureCollection } from "./siteAnalysisMapFeatures";
 
 export type OfficialPriceResponse = {
   summary: {
@@ -14,6 +15,7 @@ export type OfficialPriceResponse = {
   };
   table_rows: BasicInfoAnalysisRow[];
   chart_rows: BasicInfoAnalysisRow[];
+  map_features: SiteAnalysisMapFeatureCollection;
 };
 
 type OfficialPriceStatus = "idle" | "loading" | "success" | "error";

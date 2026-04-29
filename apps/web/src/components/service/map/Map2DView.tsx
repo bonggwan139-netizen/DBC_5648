@@ -27,6 +27,8 @@ import {
 import { useMapSearch } from "./search/mapSearchState";
 import { SiteAnalysisDetailPanel } from "./analysis/SiteAnalysisDetailPanel";
 import { SiteAnalysisOverlay } from "./analysis/SiteAnalysisOverlay";
+import { createEmptySiteAnalysisMapFeatureCollection } from "./analysis/siteAnalysisMapFeatures";
+import { useSiteAnalysis } from "./analysis/siteAnalysisState";
 import { createEmptyFeatureCollection } from "./zone-selection/zoneSelectionGeometry";
 import { useZoneSelectionMap } from "./zone-selection/useZoneSelectionMap";
 import type { CadastralFeatureCollection, ParcelProps, ZoneGeometry } from "./zone-selection/zoneSelectionTypes";
@@ -75,6 +77,10 @@ type MapClickEventLike = {
 };
 
 const BBOX_NOTICE_MESSAGE = "지적 데이터를 보려면 더 확대해 주세요.";
+const SITE_ANALYSIS_THEMATIC_SOURCE_ID = "site-analysis-thematic-map-features";
+const SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID = "site-analysis-thematic-fill";
+const SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID = "site-analysis-thematic-outline";
+const ZONE_CONFIRMED_LINE_LAYER_ID = "zone-confirmed-line";
 
 class DataApiRequestError extends Error {
   status: number;
@@ -276,6 +282,64 @@ function setGeoJsonSourceData(map: MapLibreMap | null, sourceId: string, data: {
   source?.setData(data);
 }
 
+function removeSiteAnalysisThematicMapLayers(map: MapLibreMap | null) {
+  if (!map) {
+    return;
+  }
+
+  if (map.getLayer(SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID)) {
+    map.removeLayer(SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID);
+  }
+
+  if (map.getLayer(SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID)) {
+    map.removeLayer(SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID);
+  }
+
+  if (map.getSource(SITE_ANALYSIS_THEMATIC_SOURCE_ID)) {
+    map.removeSource(SITE_ANALYSIS_THEMATIC_SOURCE_ID);
+  }
+}
+
+function ensureSiteAnalysisThematicMapLayers(map: MapLibreMap) {
+  if (!map.getSource(SITE_ANALYSIS_THEMATIC_SOURCE_ID)) {
+    map.addSource(SITE_ANALYSIS_THEMATIC_SOURCE_ID, {
+      type: "geojson",
+      data: createEmptySiteAnalysisMapFeatureCollection()
+    });
+  }
+
+  if (!map.getLayer(SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID,
+        type: "fill",
+        source: SITE_ANALYSIS_THEMATIC_SOURCE_ID,
+        paint: {
+          "fill-color": ["coalesce", ["get", "color"], "#0EA5E9"],
+          "fill-opacity": 1
+        }
+      },
+      map.getLayer(ZONE_CONFIRMED_LINE_LAYER_ID) ? ZONE_CONFIRMED_LINE_LAYER_ID : undefined
+    );
+  }
+
+  if (!map.getLayer(SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID,
+        type: "line",
+        source: SITE_ANALYSIS_THEMATIC_SOURCE_ID,
+        paint: {
+          "line-color": "#1F2937",
+          "line-opacity": 1,
+          "line-width": 1
+        }
+      },
+      map.getLayer(ZONE_CONFIRMED_LINE_LAYER_ID) ? ZONE_CONFIRMED_LINE_LAYER_ID : undefined
+    );
+  }
+}
+
 export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -298,6 +362,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
   const selectedInfoParcelId = selectedParcel ? pickParcelSelectionKey(selectedParcel) : null;
   const { state: mapSearchState, consumePendingNavigation } = useMapSearch();
+  const { activeDetailItem, activeThematicMapFeatures, canOpen: canOpenSiteAnalysis } = useSiteAnalysis();
 
   const {
     decoratedVisibleFeatures,
@@ -741,6 +806,32 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
     setGeoJsonSourceData(mapRef.current, ZONE_CONFIRMED_SOURCE_ID, confirmedZoneCollection);
   }, [confirmedZoneCollection, isMapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!isMapReady || !map) {
+      return;
+    }
+
+    const shouldShowThematicMap =
+      canOpenSiteAnalysis &&
+      activeDetailItem !== null &&
+      activeDetailItem !== "basicLocationInfo" &&
+      activeThematicMapFeatures !== null;
+
+    if (!shouldShowThematicMap) {
+      removeSiteAnalysisThematicMapLayers(map);
+      return;
+    }
+
+    ensureSiteAnalysisThematicMapLayers(map);
+    setGeoJsonSourceData(map, SITE_ANALYSIS_THEMATIC_SOURCE_ID, activeThematicMapFeatures);
+
+    return () => {
+      removeSiteAnalysisThematicMapLayers(map);
+    };
+  }, [activeDetailItem, activeThematicMapFeatures, canOpenSiteAnalysis, isMapReady]);
 
   if (!isMapRenderable) {
     return <MapEnvGuardNotice mode="2d" />;

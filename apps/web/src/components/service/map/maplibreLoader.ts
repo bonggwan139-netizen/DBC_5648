@@ -1,6 +1,6 @@
 export type MapLibreMap = {
   addControl: (control: unknown, position?: string) => void;
-  addLayer: (layer: Record<string, unknown>) => void;
+  addLayer: (layer: Record<string, unknown>, beforeId?: string) => void;
   addSource: (id: string, source: Record<string, unknown>) => void;
   flyTo: (options: { center: [number, number]; zoom?: number; essential?: boolean; duration?: number }) => void;
   getBounds: () => {
@@ -14,6 +14,7 @@ export type MapLibreMap = {
         setData: (data: { type: "FeatureCollection"; features: unknown[] }) => void;
       }
     | undefined;
+  getLayer: (id: string) => unknown | undefined;
   on: (...args: unknown[]) => void;
   project: (lngLat: { lng: number; lat: number } | [number, number]) => {
     x: number;
@@ -24,6 +25,8 @@ export type MapLibreMap = {
     properties?: Record<string, unknown>;
   }>;
   remove: () => void;
+  removeLayer: (id: string) => void;
+  removeSource: (id: string) => void;
   setLayoutProperty: (layerId: string, name: string, value: string) => void;
 };
 
