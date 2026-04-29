@@ -11,30 +11,39 @@ import {
 import { buildSiteAnalysisLocationRows } from "./siteAnalysisLocation";
 import { useSiteAnalysisOfficialPrice } from "./siteAnalysisOfficialPrice";
 import { useSiteAnalysisOwnership } from "./siteAnalysisOwnership";
+import { useSiteAnalysisRoadSide } from "./siteAnalysisRoadSide";
 import { useSiteAnalysis } from "./siteAnalysisState";
+import { useSiteAnalysisTerrainShape } from "./siteAnalysisTerrainShape";
 
 const areaFormatter = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 2
 });
 const countFormatter = new Intl.NumberFormat("ko-KR");
 const pastelFallbacks = ["#BFD7FF", "#CDECCF", "#FFD6A5", "#FBCFE8", "#DDD6FE", "#BAE6FD", "#FDE68A"];
+const areaBasisNoticeLines = [
+  "※ 계 = 완전편입 대장면적 + 부분편입 구적면적",
+  "※ 면적오차 = 구역계 면적 - 계"
+];
 const landCategoryNoticeLines = [
-  "※ 면적은 확정 구역과 필지가 실제 겹치는 구적면적 기준입니다.",
-  "※ 구역계 면적은 확정 구역 전체 면적, 계는 지목별 면적 합계, 면적오차는 두 값의 차이입니다."
+  ...areaBasisNoticeLines
 ];
 const ownershipNoticeLines = [
-  "※ 면적은 확정 구역과 필지가 실제 겹치는 구적면적 기준입니다.",
-  "※ 구역계 면적은 확정 구역 전체 면적, 계는 소유별 면적 합계, 면적오차는 두 값의 차이입니다."
+  ...areaBasisNoticeLines
 ];
 const areaSummaryNoticeLines = [
-  "※ 면적은 확정 구역과 필지가 실제 겹치는 구적면적 기준입니다.",
-  "※ 구역계 면적은 확정 구역 전체 면적, 계는 면적별 면적 합계, 면적오차는 두 값의 차이입니다.",
+  ...areaBasisNoticeLines,
   "※ 면적 구간은 서비스 초기 고정 기준이며, 추후 데이터 확대에 따라 조정될 수 있습니다."
 ];
 const officialPriceNoticeLines = [
-  "※ 면적은 확정 구역과 필지가 실제 겹치는 구적면적 기준입니다.",
-  "※ 구역계 면적은 확정 구역 전체 면적, 계는 공시지가별 면적 합계, 면적오차는 두 값의 차이입니다.",
+  ...areaBasisNoticeLines,
   "※ 공시지가 구간은 서비스 초기 고정 기준이며, 추후 데이터 확대에 따라 조정될 수 있습니다."
+];
+const terrainShapeNoticeLines = [
+  ...areaBasisNoticeLines
+];
+const roadSideNoticeLines = [
+  ...areaBasisNoticeLines,
+  "※ 비접도는 세로한면(불), 세로각지(불), 맹지로 분류된 토지를 의미합니다."
 ];
 const areaSummaryColorOverrides: Record<string, string> = {
   "area_range:unknown": "#CBD5E1",
@@ -54,6 +63,35 @@ const officialPriceColorOverrides: Record<string, string> = {
   "official_price_range:3000000_10000000": "#3B82F6",
   "official_price_range:over_10000000": "#2563EB"
 };
+const terrainShapeColorOverrides: Record<string, string> = {
+  "terrain_shape:가로장방": "#93C5FD",
+  "가로장방": "#93C5FD",
+  "terrain_shape:세로장방": "#F9A8D4",
+  "세로장방": "#F9A8D4",
+  "terrain_shape:정방형": "#86EFAC",
+  "정방형": "#86EFAC",
+  "terrain_shape:삼각형": "#FDE68A",
+  "삼각형": "#FDE68A",
+  "terrain_shape:역삼각": "#67E8F9",
+  "역삼각": "#67E8F9",
+  "terrain_shape:사다리형": "#FDBA74",
+  "사다리형": "#FDBA74",
+  "terrain_shape:자루형": "#C4B5FD",
+  "자루형": "#C4B5FD",
+  "terrain_shape:부정형": "#F0ABFC",
+  "부정형": "#F0ABFC",
+  "terrain_shape:지정되지않음": "#CBD5E1",
+  "지정되지않음": "#CBD5E1",
+  "terrain_shape:기타(값 없음 등)": "#CBD5E1",
+  "기타(값 없음 등)": "#CBD5E1",
+  "terrain_shape:unknown": "#CBD5E1",
+  "unknown": "#CBD5E1"
+};
+const roadSideColorOverrides: Record<string, string> = {
+  "road_side:access": "#0EA5E9",
+  "road_side:no_access": "#F97316",
+  "road_side:other": "#94A3B8"
+};
 
 function formatArea(value: number) {
   return `${areaFormatter.format(value)}㎡`;
@@ -68,11 +106,11 @@ function formatParcelCount(value: number | null) {
 }
 
 function getRowColor(row: BasicInfoAnalysisRow, index: number, colorOverrides?: Record<string, string>) {
-  return colorOverrides?.[row.key] ?? row.color ?? pastelFallbacks[index % pastelFallbacks.length];
+  return colorOverrides?.[row.key] ?? colorOverrides?.[row.label] ?? row.color ?? pastelFallbacks[index % pastelFallbacks.length];
 }
 
 function getTableRowColor(row: BasicInfoAnalysisRow, colorOverrides?: Record<string, string>) {
-  return colorOverrides?.[row.key] ?? row.color;
+  return colorOverrides?.[row.key] ?? colorOverrides?.[row.label] ?? row.color;
 }
 
 function getLandCategoryCellClass(row: BasicInfoAnalysisRow, className = "") {
@@ -119,6 +157,20 @@ export function SiteAnalysisDetailPanel() {
     loadOfficialPrice,
     status: officialPriceStatus
   } = useSiteAnalysisOfficialPrice();
+  const {
+    canRequest: canRequestTerrainShape,
+    data: terrainShapeData,
+    error: terrainShapeError,
+    loadTerrainShape,
+    status: terrainShapeStatus
+  } = useSiteAnalysisTerrainShape();
+  const {
+    canRequest: canRequestRoadSide,
+    data: roadSideData,
+    error: roadSideError,
+    loadRoadSide,
+    status: roadSideStatus
+  } = useSiteAnalysisRoadSide();
   const [collapsed, setCollapsed] = useState(false);
   const locationRows = buildSiteAnalysisLocationRows(data);
 
@@ -157,6 +209,18 @@ export function SiteAnalysisDetailPanel() {
       void loadOfficialPrice();
     }
   }, [activeDetailItem, canRequestOfficialPrice, loadOfficialPrice, officialPriceStatus]);
+
+  useEffect(() => {
+    if (canRequestTerrainShape && activeDetailItem === "basicTerrainShape" && terrainShapeStatus === "idle") {
+      void loadTerrainShape();
+    }
+  }, [activeDetailItem, canRequestTerrainShape, loadTerrainShape, terrainShapeStatus]);
+
+  useEffect(() => {
+    if (canRequestRoadSide && activeDetailItem === "basicRoadSide" && roadSideStatus === "idle") {
+      void loadRoadSide();
+    }
+  }, [activeDetailItem, canRequestRoadSide, loadRoadSide, roadSideStatus]);
 
   if (!canOpen || !activeDetailItem) {
     return null;
@@ -227,6 +291,28 @@ export function SiteAnalysisDetailPanel() {
               colorOverrides={officialPriceColorOverrides}
               status={officialPriceStatus}
               title="공시지가"
+            />
+          ) : activeDetailItem === "basicTerrainShape" ? (
+            <CategoryAnalysisContent
+              data={terrainShapeData}
+              emptyMessage="분석 결과에서 토지형상을 찾을 수 없습니다."
+              error={terrainShapeError}
+              loadingMessage="토지형상을 불러오는 중입니다."
+              noticeLines={terrainShapeNoticeLines}
+              colorOverrides={terrainShapeColorOverrides}
+              status={terrainShapeStatus}
+              title="토지형상"
+            />
+          ) : activeDetailItem === "basicRoadSide" ? (
+            <CategoryAnalysisContent
+              data={roadSideData}
+              emptyMessage="분석 결과에서 접도구분을 찾을 수 없습니다."
+              error={roadSideError}
+              loadingMessage="접도구분을 불러오는 중입니다."
+              noticeLines={roadSideNoticeLines}
+              colorOverrides={roadSideColorOverrides}
+              status={roadSideStatus}
+              title="접도구분"
             />
           ) : (
             <CategoryAnalysisContent
@@ -448,7 +534,7 @@ function LandCategoryTable({
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200">
-      <div className="max-h-[360px] overflow-auto">
+      <div className="overflow-x-auto">
         <table className="w-full min-w-[560px] divide-y divide-slate-200 text-left text-[11px] font-[family-name:var(--font-pretendard)]">
           <thead className="sticky top-0 bg-slate-50 text-slate-500">
             <tr>

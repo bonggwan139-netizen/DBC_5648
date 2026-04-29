@@ -10,7 +10,9 @@ export type SiteAnalysisDetailItem =
   | "basicLandCategory"
   | "basicOwnership"
   | "basicAreaSummary"
-  | "basicOfficialPrice";
+  | "basicOfficialPrice"
+  | "basicTerrainShape"
+  | "basicRoadSide";
 
 type SiteAnalysisContextValue = {
   activeSection: SiteAnalysisTopSection | null;
