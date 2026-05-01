@@ -3,6 +3,14 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLandRegister } from "./landRegisterState";
+import {
+  type BuildingUseChartRow,
+  type BuildingUseLayerItem,
+  type BuildingUseResponse,
+  type BuildingUseTableColumn,
+  type BuildingUseTableRow,
+  useSiteAnalysisBuildingUse
+} from "./siteAnalysisBuildingInfo";
 import { useSiteAnalysisAreaSummary } from "./siteAnalysisAreaSummary";
 import {
   type BasicInfoAnalysisRow,
@@ -56,6 +64,10 @@ function formatRatio(value: number | null) {
 
 function formatParcelCount(value: number | null) {
   return value === null ? "-" : countFormatter.format(value);
+}
+
+function formatNullableNumber(value: number | null | undefined) {
+  return value === null || value === undefined ? "-" : countFormatter.format(value);
 }
 
 function getRowColor(row: BasicInfoAnalysisRow, index: number) {
@@ -124,6 +136,13 @@ export function SiteAnalysisDetailPanel() {
     loadRoadSide,
     status: roadSideStatus
   } = useSiteAnalysisRoadSide();
+  const {
+    canRequest: canRequestBuildingUse,
+    data: buildingUseData,
+    error: buildingUseError,
+    loadBuildingUse,
+    status: buildingUseStatus
+  } = useSiteAnalysisBuildingUse();
   const [collapsed, setCollapsed] = useState(false);
   const locationRows = buildSiteAnalysisLocationRows(data);
 
@@ -175,6 +194,12 @@ export function SiteAnalysisDetailPanel() {
     }
   }, [activeDetailItem, canRequestRoadSide, loadRoadSide, roadSideStatus]);
 
+  useEffect(() => {
+    if (canRequestBuildingUse && activeDetailItem === "buildingUse" && buildingUseStatus === "idle") {
+      void loadBuildingUse();
+    }
+  }, [activeDetailItem, buildingUseStatus, canRequestBuildingUse, loadBuildingUse]);
+
   const activeThematicMapFeatures =
     activeDetailItem === "basicLandCategory"
       ? landCategoryData?.map_features ?? null
@@ -188,6 +213,8 @@ export function SiteAnalysisDetailPanel() {
               ? terrainShapeData?.map_features ?? null
               : activeDetailItem === "basicRoadSide"
                 ? roadSideData?.map_features ?? null
+                : activeDetailItem === "buildingUse"
+                  ? buildingUseData?.map_features ?? null
                 : null;
 
   useEffect(() => {
@@ -203,7 +230,8 @@ export function SiteAnalysisDetailPanel() {
     return null;
   }
 
-  const panelTitle = activeDetailItem === "basicLocationInfo" ? "위치정보" : "토지정보";
+  const panelTitle =
+    activeDetailItem === "basicLocationInfo" ? "위치정보" : activeDetailItem === "buildingUse" ? "건축물정보" : "토지정보";
 
   return (
     <motion.aside
@@ -237,6 +265,8 @@ export function SiteAnalysisDetailPanel() {
 
           {activeDetailItem === "basicLocationInfo" ? (
             <LocationInfoContent error={error} locationRows={locationRows} status={status} />
+          ) : activeDetailItem === "buildingUse" ? (
+            <BuildingUseContent data={buildingUseData} error={buildingUseError} status={buildingUseStatus} />
           ) : activeDetailItem === "basicOwnership" ? (
             <CategoryAnalysisContent
               data={ownershipData}
@@ -360,6 +390,266 @@ function LocationInfoContent({
         </p>
       ) : null}
     </section>
+  );
+}
+
+const buildingUseColumnKeys = ["color", "label", "main_building_count", "ratio_percent", "accessory_building_count"];
+const fallbackBuildingUseColumns: BuildingUseTableColumn[] = [
+  { key: "color", label: "범례", type: "color" },
+  { key: "label", label: "구분", type: "text" },
+  { key: "main_building_count", label: "주건축물(동)", type: "number" },
+  { key: "ratio_percent", label: "구성비(%)", type: "percent" },
+  { key: "accessory_building_count", label: "부속건축물(동)", type: "number" }
+];
+
+function getBuildingUseColumns(data: BuildingUseResponse) {
+  const columns = data.table.columns.filter((column) => buildingUseColumnKeys.includes(column.key));
+  return columns.length > 0 ? columns : fallbackBuildingUseColumns;
+}
+
+function BuildingUseContent({
+  data,
+  error,
+  status
+}: {
+  data: BuildingUseResponse | null;
+  error: string | null;
+  status: "idle" | "loading" | "success" | "error" | "empty";
+}) {
+  const title = data?.title ?? "용도현황";
+  const breadcrumb = data?.breadcrumb?.join(" > ");
+
+  return (
+    <section className="min-h-0 flex-1 overflow-y-auto pt-5 font-[family-name:var(--font-pretendard)]">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+        {breadcrumb ? <p className="mt-1 text-[11px] font-medium text-slate-400">{breadcrumb}</p> : null}
+      </div>
+
+      {status === "loading" ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
+          용도현황을 불러오는 중입니다.
+        </p>
+      ) : null}
+
+      {status === "error" ? (
+        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-[12px] text-rose-700">
+          {error ?? "용도현황을 불러오지 못했습니다."}
+        </p>
+      ) : null}
+
+      {(status === "success" || status === "empty") && data ? (
+        <div className="mt-4 flex flex-col gap-4">
+          <BuildingUseSummaryCards data={data} />
+
+          {status === "empty" ? (
+            <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
+              선택 구역 내 건축물 데이터가 없습니다.
+            </p>
+          ) : null}
+
+          <BuildingUseTableView data={data} />
+          <BuildingUseChartView rows={data.chart.rows} />
+          <BuildingUseLayerList layers={data.layers} />
+
+          {data.warnings.length > 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">
+              {data.warnings.map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function BuildingUseSummaryCards({ data }: { data: BuildingUseResponse }) {
+  const cards = [
+    { label: "건축물 수", value: data.summary.building_count },
+    { label: "용도 분류 수", value: data.summary.category_count },
+    { label: "주건축물 수", value: data.summary.main_building_count },
+    { label: "부속건축물 수", value: data.summary.accessory_building_count }
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {cards.map((card) => (
+        <div key={card.label} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <p className="text-[11px] font-medium text-slate-500">{card.label}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900">{countFormatter.format(card.value)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BuildingUseTableView({ data }: { data: BuildingUseResponse }) {
+  const columns = getBuildingUseColumns(data);
+  const rows = data.table.total_row ? [...data.table.rows, data.table.total_row] : data.table.rows;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-3 py-2">
+        <p className="text-sm font-semibold text-slate-800">{data.table.title}</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] divide-y divide-slate-200 text-left text-[11px]">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              {columns.map((column) => (
+                <th key={column.key} className="px-3 py-2 font-semibold">
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-slate-700">
+            {rows.length > 0 ? (
+              rows.map((row) => (
+                <tr key={row.key} className={row.row_type === "total" ? "border-t-2 border-slate-300 bg-slate-50 font-semibold text-slate-900" : "font-medium"}>
+                  {columns.map((column) => (
+                    <td key={column.key} className="whitespace-nowrap px-3 py-2">
+                      {renderBuildingUseTableCell(row, column)}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={columns.length} className="px-3 py-4 text-center text-[12px] text-slate-500">
+                  표시할 용도현황이 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {data.table.footnotes.length > 0 ? (
+        <div className="border-t border-slate-100 px-3 py-2 text-[11px] leading-5 text-slate-500">
+          {data.table.footnotes.map((footnote) => (
+            <p key={footnote}>{footnote}</p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function renderBuildingUseTableCell(row: BuildingUseTableRow, column: BuildingUseTableColumn) {
+  switch (column.key) {
+    case "color":
+      return row.color ? <span className="block h-3 w-3 rounded-full" style={{ backgroundColor: row.color }} /> : "-";
+    case "label":
+      return row.label;
+    case "main_building_count":
+      return formatNullableNumber(row.main_building_count);
+    case "ratio_percent":
+      return formatRatio(row.ratio_percent);
+    case "accessory_building_count":
+      return formatNullableNumber(row.accessory_building_count);
+    default:
+      return "-";
+  }
+}
+
+function BuildingUseChartView({ rows }: { rows: BuildingUseChartRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
+        표시할 용도 차트가 없습니다.
+      </p>
+    );
+  }
+
+  const totalValue = rows.reduce((sum, row) => sum + Math.max(row.value, 0), 0);
+  let offset = 0;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <p className="mb-3 text-sm font-semibold text-slate-800">용도 차트</p>
+      <div className="flex items-center gap-5">
+        <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" role="img" aria-label="용도 차트">
+          <circle cx="60" cy="60" r="42" fill="#f8fafc" />
+          {rows.map((row) => {
+            const ratio =
+              row.ratio_percent !== null
+                ? Math.max(row.ratio_percent, 0)
+                : totalValue > 0
+                  ? (Math.max(row.value, 0) / totalValue) * 100
+                  : 0;
+            const dashOffset = offset;
+            offset += ratio;
+
+            return (
+              <circle
+                key={row.key}
+                cx="60"
+                cy="60"
+                r="42"
+                fill="none"
+                stroke={row.color}
+                strokeDasharray={`${ratio} ${Math.max(100 - ratio, 0)}`}
+                strokeDashoffset={-dashOffset}
+                strokeWidth="24"
+                pathLength={100}
+                transform="rotate(-90 60 60)"
+              />
+            );
+          })}
+          <circle cx="60" cy="60" r="27" fill="white" />
+        </svg>
+
+        <div className="min-w-0 flex-1 space-y-2">
+          {rows.map((row) => (
+            <div key={row.key} className="flex items-start gap-2 text-[12px] text-slate-600">
+              <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
+              <div className="min-w-0">
+                <p className="font-medium text-slate-800">{row.label}</p>
+                <p className="text-[11px] text-slate-500">
+                  {countFormatter.format(row.value)}동 · {formatRatio(row.ratio_percent)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BuildingUseLayerList({ layers }: { layers: BuildingUseResponse["layers"] }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">사용자레이어</p>
+      <p className="mt-1 text-sm font-semibold text-slate-800">
+        {layers.group_label} · {layers.layer_label}
+      </p>
+      {layers.items.length > 0 ? (
+        <ul className="mt-3 space-y-2">
+          {layers.items.map((item) => (
+            <BuildingUseLayerItemRow key={item.key} item={item} />
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-[12px] text-slate-500">
+          표시할 사용자레이어 항목이 없습니다.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function BuildingUseLayerItemRow({ item }: { item: BuildingUseLayerItem }) {
+  return (
+    <li className="flex items-center justify-between gap-3 text-[12px] text-slate-600">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+        <span className="truncate font-medium text-slate-800">{item.label}</span>
+      </span>
+      <span className="shrink-0 text-slate-500">{countFormatter.format(item.count)}동</span>
+    </li>
   );
 }
 

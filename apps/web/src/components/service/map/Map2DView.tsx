@@ -79,6 +79,7 @@ type MapClickEventLike = {
 const BBOX_NOTICE_MESSAGE = "지적 데이터를 보려면 더 확대해 주세요.";
 const SITE_ANALYSIS_THEMATIC_SOURCE_ID = "site-analysis-thematic-map-features";
 const SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID = "site-analysis-thematic-fill";
+const SITE_ANALYSIS_THEMATIC_POINT_LAYER_ID = "site-analysis-thematic-point";
 const SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID = "site-analysis-thematic-outline";
 const ZONE_CONFIRMED_LINE_LAYER_ID = "zone-confirmed-line";
 
@@ -291,6 +292,10 @@ function removeSiteAnalysisThematicMapLayers(map: MapLibreMap | null) {
     map.removeLayer(SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID);
   }
 
+  if (map.getLayer(SITE_ANALYSIS_THEMATIC_POINT_LAYER_ID)) {
+    map.removeLayer(SITE_ANALYSIS_THEMATIC_POINT_LAYER_ID);
+  }
+
   if (map.getLayer(SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID)) {
     map.removeLayer(SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID);
   }
@@ -314,8 +319,9 @@ function ensureSiteAnalysisThematicMapLayers(map: MapLibreMap) {
         id: SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID,
         type: "fill",
         source: SITE_ANALYSIS_THEMATIC_SOURCE_ID,
+        filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
         paint: {
-          "fill-color": ["coalesce", ["get", "color"], "#0EA5E9"],
+          "fill-color": ["get", "color"],
           "fill-opacity": 1
         }
       },
@@ -329,10 +335,31 @@ function ensureSiteAnalysisThematicMapLayers(map: MapLibreMap) {
         id: SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID,
         type: "line",
         source: SITE_ANALYSIS_THEMATIC_SOURCE_ID,
+        filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
         paint: {
           "line-color": "#1F2937",
           "line-opacity": 1,
           "line-width": 1
+        }
+      },
+      map.getLayer(ZONE_CONFIRMED_LINE_LAYER_ID) ? ZONE_CONFIRMED_LINE_LAYER_ID : undefined
+    );
+  }
+
+  if (!map.getLayer(SITE_ANALYSIS_THEMATIC_POINT_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: SITE_ANALYSIS_THEMATIC_POINT_LAYER_ID,
+        type: "circle",
+        source: SITE_ANALYSIS_THEMATIC_SOURCE_ID,
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          "circle-color": ["get", "color"],
+          "circle-opacity": 1,
+          "circle-radius": 6,
+          "circle-stroke-color": "#1F2937",
+          "circle-stroke-opacity": 1,
+          "circle-stroke-width": 1
         }
       },
       map.getLayer(ZONE_CONFIRMED_LINE_LAYER_ID) ? ZONE_CONFIRMED_LINE_LAYER_ID : undefined

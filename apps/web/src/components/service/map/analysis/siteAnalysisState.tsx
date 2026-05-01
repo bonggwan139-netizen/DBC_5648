@@ -13,7 +13,8 @@ export type SiteAnalysisDetailItem =
   | "basicAreaSummary"
   | "basicOfficialPrice"
   | "basicTerrainShape"
-  | "basicRoadSide";
+  | "basicRoadSide"
+  | "buildingUse";
 
 type SiteAnalysisContextValue = {
   activeSection: SiteAnalysisTopSection | null;

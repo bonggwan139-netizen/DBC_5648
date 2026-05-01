@@ -30,9 +30,10 @@ const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
   },
   {
     title: "건축물정보",
-    items: ["용도현황", "구조현황", "층수현황", "경과년도", "연면적현황", "건폐율현황", "용적률현황"].map(
-      (label) => ({ label })
-    )
+    items: [
+      { label: "용도현황", detailItem: "buildingUse" },
+      ...["구조현황", "층수현황", "경과년도", "연면적현황", "건폐율현황", "용적률현황"].map((label) => ({ label }))
+    ]
   },
   {
     title: "도시계획정보",
