@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
+import { downloadLandRegisterExcel } from "./landRegisterExcel";
 import { useLandRegister } from "./landRegisterState";
 import type { LandRegisterRow } from "./landRegisterTypes";
 
@@ -40,6 +41,21 @@ function getRowKey(row: LandRegisterRow) {
 
 export function LandRegisterOverlay() {
   const { isOpen, status, data, error, closeLandRegister } = useLandRegister();
+  const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
+  const canDownloadExcel = status === "success" && data !== null && !isDownloadingExcel;
+
+  const handleDownloadExcel = async () => {
+    if (!data || !canDownloadExcel) {
+      return;
+    }
+
+    try {
+      setIsDownloadingExcel(true);
+      await downloadLandRegisterExcel(data);
+    } finally {
+      setIsDownloadingExcel(false);
+    }
+  };
 
   if (!isOpen) {
     return null;
@@ -54,16 +70,26 @@ export function LandRegisterOverlay() {
             <h2 className="mt-1 text-base font-semibold text-slate-900">토지조서</h2>
           </div>
 
-          <button
-            type="button"
-            onClick={closeLandRegister}
-            aria-label="토지조서 닫기"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
-          >
-            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden="true">
-              <path d="m5.5 5.5 9 9m0-9-9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadExcel}
+              disabled={!canDownloadExcel}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              엑셀 다운
+            </button>
+            <button
+              type="button"
+              onClick={closeLandRegister}
+              aria-label="토지조서 닫기"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            >
+              <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden="true">
+                <path d="m5.5 5.5 9 9m0-9-9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
