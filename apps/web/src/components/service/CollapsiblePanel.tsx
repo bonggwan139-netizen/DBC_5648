@@ -12,13 +12,67 @@ const siteAnalysisActions: Array<{ section: SiteAnalysisSection; label: string }
   { section: "locationAnalysis", label: "입지분석" }
 ];
 
+function formatReportTimestamp(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    "_",
+    pad(date.getHours()),
+    pad(date.getMinutes())
+  ].join("");
+}
+
+function stripFilenameQuotes(value: string) {
+  const trimmed = value.trim();
+  return trimmed.startsWith("\"") && trimmed.endsWith("\"") ? trimmed.slice(1, -1) : trimmed;
+}
+
+function parseContentDispositionFilename(header: string | null) {
+  if (!header) {
+    return null;
+  }
+
+  const filenameStarMatch = header.match(/filename\*=([^;]+)/i);
+  if (filenameStarMatch) {
+    const encodedPart = stripFilenameQuotes(filenameStarMatch[1]);
+    const rfc5987Parts = encodedPart.split("'");
+    const encodedFilename = rfc5987Parts.length >= 3 ? rfc5987Parts.slice(2).join("'") : encodedPart;
+
+    try {
+      return decodeURIComponent(encodedFilename);
+    } catch {
+      return encodedFilename;
+    }
+  }
+
+  const filenameMatch = header.match(/filename=("[^"]+"|[^;]+)/i);
+  return filenameMatch ? stripFilenameQuotes(filenameMatch[1]) : null;
+}
+
+function downloadReportBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function CollapsiblePanel() {
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isWordReportDownloading, setIsWordReportDownloading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const { state: searchState, submitSearch } = useMapSearch();
   const { canRequest: canRequestLandRegister, openLandRegister } = useLandRegister();
   const { activeSection, canOpen: canOpenSiteAnalysis, openSection } = useSiteAnalysis();
   const {
+    state: zoneSelectionState,
     modeBadgeLabel,
     detailLabel,
     feedback,
@@ -37,6 +91,49 @@ export function CollapsiblePanel() {
   const handleSubmitSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await submitSearch(searchQuery);
+  };
+
+  const confirmedZone =
+    zoneSelectionState.status === "confirmed" && zoneSelectionState.confirmedZone
+      ? zoneSelectionState.confirmedZone
+      : null;
+  const canDownloadWordReport = confirmedZone !== null && !isWordReportDownloading;
+
+  const handleDownloadWordReport = async () => {
+    if (!confirmedZone || !canDownloadWordReport) {
+      return;
+    }
+
+    setReportError(null);
+    setIsWordReportDownloading(true);
+
+    try {
+      const response = await fetch("/analysis/report/word", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          zone: confirmedZone.geometry
+        })
+      });
+
+      if (!response.ok) {
+        const message = await response.text().catch(() => "");
+        throw new Error(message || `보고서 다운로드에 실패했습니다. (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const filename =
+        parseContentDispositionFilename(response.headers.get("Content-Disposition")) ??
+        `대상지_현황분석_보고서_${formatReportTimestamp(new Date())}.docx`;
+
+      downloadReportBlob(blob, filename);
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : "보고서 다운로드 중 오류가 발생했습니다.");
+    } finally {
+      setIsWordReportDownloading(false);
+    }
   };
 
   return (
@@ -253,6 +350,32 @@ export function CollapsiblePanel() {
                 </p>
               )}
             </section>
+
+            {canOpenSiteAnalysis ? (
+              <section className="rounded-2xl border border-stroke bg-white p-4">
+                <p className="text-sm font-semibold text-slate-700">Report</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadWordReport}
+                    disabled={!canDownloadWordReport}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isWordReportDownloading ? "word..." : "word"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    title="PDF 보고서 다운로드는 추후 제공됩니다."
+                    aria-label="pdf 보고서 다운로드는 추후 제공됩니다."
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    pdf
+                  </button>
+                </div>
+                {reportError ? <p className="mt-2 text-[11px] text-rose-600">{reportError}</p> : null}
+              </section>
+            ) : null}
           </div>
         ) : (
           <div className="flex h-full flex-col items-center gap-4 pt-4">
