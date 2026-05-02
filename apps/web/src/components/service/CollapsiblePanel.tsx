@@ -7,9 +7,9 @@ import { useSiteAnalysis, type SiteAnalysisSection } from "@/components/service/
 import { useMapSearch } from "@/components/service/map/search/mapSearchState";
 import { useZoneSelectionPanel } from "@/components/service/map/zone-selection/useZoneSelectionPanel";
 
-const siteAnalysisActions: Array<{ section: SiteAnalysisSection; label: string; disabled?: boolean }> = [
+const siteAnalysisActions: Array<{ section: SiteAnalysisSection; label: string }> = [
   { section: "basic", label: "기본정보" },
-  { section: "locationAnalysis", label: "입지분석", disabled: true }
+  { section: "locationAnalysis", label: "입지분석" }
 ];
 
 export function CollapsiblePanel() {
@@ -236,15 +236,13 @@ export function CollapsiblePanel() {
                         key={action.section}
                         type="button"
                         onClick={() => openSection(action.section)}
-                        disabled={action.disabled}
-                        className={`flex h-10 items-center justify-between rounded-xl border border-dashed px-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        className={`flex h-10 items-center justify-between rounded-xl border border-dashed px-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${
                           isActive
                             ? "border-slate-700 bg-slate-900 text-white"
                             : "border-slate-300 bg-slate-50 text-slate-600 hover:bg-white"
                         }`}
                       >
                         <span>{action.label}</span>
-                        {action.disabled ? <span className="text-[10px] font-semibold">준비중</span> : null}
                       </button>
                     );
                   })}

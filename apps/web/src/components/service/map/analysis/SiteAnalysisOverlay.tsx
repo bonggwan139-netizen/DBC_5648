@@ -12,6 +12,11 @@ type BasicInfoColumn = {
   items: BasicInfoItem[];
 };
 
+type LocationAnalysisColumn = {
+  title: string;
+  items: string[];
+};
+
 const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
   {
     title: "위치정보",
@@ -52,6 +57,55 @@ const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
   }
 ];
 
+const LOCATION_ANALYSIS_COLUMNS: LocationAnalysisColumn[] = [
+  {
+    title: "자연환경분석",
+    items: [
+      "표고분석",
+      "경사분석",
+      "향분석",
+      "단면분석",
+      "생태연도",
+      "식생(임상별)",
+      "식생(영급별)",
+      "식생(수종별)",
+      "식생(경급별)",
+      "국토환경",
+      "산사태위험지도",
+      "수리/수문",
+      "기상기후",
+      "백두대간/정맥"
+    ]
+  },
+  {
+    title: "토지건물분석",
+    items: [
+      "토지이용",
+      "토지피복",
+      "지가현황/표준지",
+      "토지형상(정비사업)",
+      "노후도(정비사업)",
+      "호수밀도(정비사업)",
+      "접도율(정비사업)",
+      "지하층(정비사업)",
+      "역세권분석",
+      "주변건물현황"
+    ]
+  },
+  {
+    title: "도시계획분석",
+    items: [
+      "도시기본계획",
+      "도시관리계획",
+      "개발행위허가분석",
+      "지구단위계획구역 분석",
+      "개발구역분석",
+      "공적규제분석",
+      "문화재분석"
+    ]
+  }
+];
+
 export function SiteAnalysisOverlay() {
   const { activeDetailItem, activeSection, canOpen, closeSection, openDetailItem } = useSiteAnalysis();
 
@@ -61,8 +115,37 @@ export function SiteAnalysisOverlay() {
 
   if (activeSection === "locationAnalysis") {
     return (
-      <section className="w-[min(760px,calc(100vw-430px))] rounded-xl border border-slate-200 bg-white/95 p-4 text-sm text-slate-600 shadow-sm backdrop-blur">
-        입지분석은 준비 중입니다.
+      <section className="w-[min(860px,calc(100vw-430px))] rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
+        <header className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
+          <h2 className="text-sm font-semibold text-slate-900">입지분석</h2>
+          <button
+            type="button"
+            onClick={closeSection}
+            aria-label="입지분석 패널 닫기"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          >
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden="true">
+              <path d="m5.5 5.5 9 9m0-9-9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        </header>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {LOCATION_ANALYSIS_COLUMNS.map((column) => (
+            <div key={column.title} className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+              <h3 className="text-sm font-semibold text-slate-800">{column.title}</h3>
+              <ul className="mt-2 space-y-1.5 text-[12px] leading-5 text-slate-600">
+                {column.items.map((item) => (
+                  <li key={item}>
+                    <span className="inline-flex rounded-md px-1 py-0.5 font-medium text-slate-700 transition hover:bg-white">
+                      {item}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </section>
     );
   }
