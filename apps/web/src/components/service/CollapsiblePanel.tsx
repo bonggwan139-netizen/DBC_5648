@@ -63,11 +63,24 @@ function downloadReportBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function getReportCaptureErrorMessage(error: unknown) {
+  return error instanceof Error && error.message ? error.message : "unknown error";
+}
+
+function logReportCaptureWarning(message: string, error: unknown) {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
+  console.warn("[report-location-map]", message, error);
+}
+
 export function CollapsiblePanel() {
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isWordReportDownloading, setIsWordReportDownloading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [reportWarning, setReportWarning] = useState<string | null>(null);
   const { state: searchState, submitSearch } = useMapSearch();
   const { canRequest: canRequestLandRegister, openLandRegister } = useLandRegister();
   const { activeSection, canOpen: canOpenSiteAnalysis, openSection } = useSiteAnalysis();
@@ -105,17 +118,37 @@ export function CollapsiblePanel() {
     }
 
     setReportError(null);
+    setReportWarning(null);
     setIsWordReportDownloading(true);
 
     try {
+      let locationMapImage: string | null = null;
+
+      try {
+        const { captureReportLocationMap } = await import(
+          "@/components/service/map/analysis/reportLocationMapCapture"
+        );
+        locationMapImage = await captureReportLocationMap(confirmedZone.geometry);
+      } catch (error) {
+        const reason = getReportCaptureErrorMessage(error);
+        logReportCaptureWarning("Capture failed; continuing report download without location_map_image.", error);
+        setReportWarning(`지도 이미지 생성 실패: ${reason}`);
+      }
+
+      const requestBody: { zone: typeof confirmedZone.geometry; location_map_image?: string } = {
+        zone: confirmedZone.geometry
+      };
+
+      if (locationMapImage) {
+        requestBody.location_map_image = locationMapImage;
+      }
+
       const response = await fetch("/analysis/report/word", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          zone: confirmedZone.geometry
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -373,6 +406,7 @@ export function CollapsiblePanel() {
                     pdf
                   </button>
                 </div>
+                {reportWarning ? <p className="mt-2 text-[11px] text-amber-600">{reportWarning}</p> : null}
                 {reportError ? <p className="mt-2 text-[11px] text-rose-600">{reportError}</p> : null}
               </section>
             ) : null}
