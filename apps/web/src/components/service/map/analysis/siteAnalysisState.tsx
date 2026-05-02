@@ -14,7 +14,8 @@ export type SiteAnalysisDetailItem =
   | "basicOfficialPrice"
   | "basicTerrainShape"
   | "basicRoadSide"
-  | "buildingUse";
+  | "buildingUse"
+  | "buildingStructure";
 
 type SiteAnalysisContextValue = {
   activeSection: SiteAnalysisTopSection | null;

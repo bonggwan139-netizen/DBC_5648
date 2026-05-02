@@ -4,28 +4,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Geometry } from "geojson";
 import { useZoneSelection } from "@/components/service/map/zone-selection/zoneSelectionState";
 
-export type BuildingUseSummary = {
+export type BuildingInfoSummary = {
   zone_srid: number;
   analysis_srid: number;
   building_count: number;
   category_count: number;
   main_building_count: number;
   accessory_building_count: number;
-  unknown_use_count: number;
+  unknown_use_count?: number;
+  unknown_structure_count?: number;
   selection_geometry: string;
   display_geometry: string;
 };
 
-export type BuildingUseTableColumn = {
+export type BuildingInfoTableColumn = {
   key: "color" | "label" | "main_building_count" | "ratio_percent" | "accessory_building_count" | string;
   label: string;
   type: "color" | "text" | "number" | "percent" | string;
 };
 
-export type BuildingUseTableRow = {
+export type BuildingInfoTableRow = {
   row_type: "category" | "total";
   key: string;
   code?: string | null;
+  group_code?: string | null;
   label: string;
   color?: string | null;
   building_count: number;
@@ -35,100 +37,138 @@ export type BuildingUseTableRow = {
   note: string | null;
 };
 
-export type BuildingUseTable = {
+export type BuildingInfoTable = {
   title: string;
-  columns: BuildingUseTableColumn[];
-  rows: BuildingUseTableRow[];
-  total_row: BuildingUseTableRow | null;
+  columns: BuildingInfoTableColumn[];
+  rows: BuildingInfoTableRow[];
+  total_row: BuildingInfoTableRow | null;
   footnotes: string[];
 };
 
-export type BuildingUseChartRow = {
+export type BuildingInfoChartRow = {
   key: string;
   code?: string | null;
+  group_code?: string | null;
   label: string;
   value: number;
   ratio_percent: number | null;
   color: string;
 };
 
-export type BuildingUseChart = {
+export type BuildingInfoChart = {
   title: string;
   type: "pie" | string;
-  rows: BuildingUseChartRow[];
+  rows: BuildingInfoChartRow[];
 };
 
-export type BuildingUseLayerItem = {
+export type BuildingInfoLayerItem = {
   key: string;
   code?: string | null;
+  group_code?: string | null;
   label: string;
   color: string;
   visible: boolean;
   count: number;
 };
 
-export type BuildingUseLayers = {
+export type BuildingInfoLayers = {
   group_label: string;
   layer_label: string;
-  items: BuildingUseLayerItem[];
+  items: BuildingInfoLayerItem[];
 };
 
-export type BuildingUseMapFeatureProperties = {
+export type BuildingInfoMapFeatureProperties = {
   feature_type: "building" | string;
-  analysis_type: "building-use" | string;
+  analysis_type: "building-use" | "building-structure" | string;
   building_uid?: string;
   pnu?: string;
   key: string;
+  code?: string | null;
+  group_code?: string | null;
   label: string;
   color: string;
+  structure_cd?: string | null;
+  structure_nm?: string | null;
 };
 
-export type BuildingUseMapFeatureCollection = {
+export type BuildingInfoMapFeatureCollection = {
   type: "FeatureCollection";
   features: Array<{
     type: "Feature";
-    properties: BuildingUseMapFeatureProperties;
+    properties: BuildingInfoMapFeatureProperties;
     geometry: Geometry;
   }>;
 };
 
-export type BuildingUseDiagnostics = Record<string, unknown>;
+export type BuildingInfoDiagnostics = Record<string, unknown>;
 
-export type BuildingUseResponse = {
-  analysis_type: "building-use" | string;
+export type BuildingInfoResponse = {
+  analysis_type: "building-use" | "building-structure" | string;
   title: string;
   breadcrumb: string[];
-  summary: BuildingUseSummary;
-  table: BuildingUseTable;
-  chart: BuildingUseChart;
-  layers: BuildingUseLayers;
-  map_features: BuildingUseMapFeatureCollection;
-  category_diagnostics: BuildingUseDiagnostics;
+  summary: BuildingInfoSummary;
+  table: BuildingInfoTable;
+  chart: BuildingInfoChart;
+  layers: BuildingInfoLayers;
+  map_features: BuildingInfoMapFeatureCollection;
+  category_diagnostics: BuildingInfoDiagnostics;
   warnings: string[];
 };
 
-type BuildingUseStatus = "idle" | "loading" | "success" | "error" | "empty";
+export type BuildingUseSummary = BuildingInfoSummary;
+export type BuildingUseTableColumn = BuildingInfoTableColumn;
+export type BuildingUseTableRow = BuildingInfoTableRow;
+export type BuildingUseTable = BuildingInfoTable;
+export type BuildingUseChartRow = BuildingInfoChartRow;
+export type BuildingUseChart = BuildingInfoChart;
+export type BuildingUseLayerItem = BuildingInfoLayerItem;
+export type BuildingUseLayers = BuildingInfoLayers;
+export type BuildingUseMapFeatureProperties = BuildingInfoMapFeatureProperties;
+export type BuildingUseMapFeatureCollection = BuildingInfoMapFeatureCollection;
+export type BuildingUseDiagnostics = BuildingInfoDiagnostics;
+export type BuildingUseResponse = BuildingInfoResponse;
 
-type BuildingUseState = {
-  status: BuildingUseStatus;
-  data: BuildingUseResponse | null;
+export type BuildingStructureSummary = BuildingInfoSummary;
+export type BuildingStructureTableColumn = BuildingInfoTableColumn;
+export type BuildingStructureTableRow = BuildingInfoTableRow;
+export type BuildingStructureTable = BuildingInfoTable;
+export type BuildingStructureChartRow = BuildingInfoChartRow;
+export type BuildingStructureChart = BuildingInfoChart;
+export type BuildingStructureLayerItem = BuildingInfoLayerItem;
+export type BuildingStructureLayers = BuildingInfoLayers;
+export type BuildingStructureMapFeatureProperties = BuildingInfoMapFeatureProperties;
+export type BuildingStructureMapFeatureCollection = BuildingInfoMapFeatureCollection;
+export type BuildingStructureDiagnostics = BuildingInfoDiagnostics;
+export type BuildingStructureResponse = BuildingInfoResponse;
+
+type BuildingInfoStatus = "idle" | "loading" | "success" | "error" | "empty";
+
+type BuildingInfoState = {
+  status: BuildingInfoStatus;
+  data: BuildingInfoResponse | null;
   error: string | null;
 };
 
-const initialState: BuildingUseState = {
+const initialState: BuildingInfoState = {
   status: "idle",
   data: null,
   error: null
 };
 
-export function useSiteAnalysisBuildingUse() {
+function useSiteAnalysisBuildingInfoRequest({
+  endpoint,
+  label
+}: {
+  endpoint: "/analysis/building-info/use" | "/analysis/building-info/structure";
+  label: string;
+}) {
   const { state: zoneState } = useZoneSelection();
-  const [state, setState] = useState<BuildingUseState>(initialState);
+  const [state, setState] = useState<BuildingInfoState>(initialState);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const canRequest = zoneState.status === "confirmed" && zoneState.confirmedZone !== null;
 
-  const loadBuildingUse = useCallback(async () => {
+  const loadBuildingInfo = useCallback(async () => {
     if (zoneState.status !== "confirmed" || !zoneState.confirmedZone) {
       setState({
         status: "error",
@@ -149,7 +189,7 @@ export function useSiteAnalysisBuildingUse() {
     });
 
     try {
-      const response = await fetch("/analysis/building-info/use", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -162,10 +202,10 @@ export function useSiteAnalysisBuildingUse() {
 
       if (!response.ok) {
         const message = await response.text();
-        throw new Error(message || `용도현황 요청에 실패했습니다. (${response.status})`);
+        throw new Error(message || `${label} 요청에 실패했습니다. (${response.status})`);
       }
 
-      const data = (await response.json()) as BuildingUseResponse;
+      const data = (await response.json()) as BuildingInfoResponse;
       setState({
         status: data.summary.building_count === 0 ? "empty" : "success",
         data,
@@ -179,14 +219,14 @@ export function useSiteAnalysisBuildingUse() {
       setState({
         status: "error",
         data: null,
-        error: error instanceof Error ? error.message : "용도현황 요청 중 오류가 발생했습니다."
+        error: error instanceof Error ? error.message : `${label} 요청 중 오류가 발생했습니다.`
       });
     } finally {
       if (abortControllerRef.current === abortController) {
         abortControllerRef.current = null;
       }
     }
-  }, [zoneState.confirmedZone, zoneState.status]);
+  }, [endpoint, label, zoneState.confirmedZone, zoneState.status]);
 
   useEffect(() => {
     if (canRequest) {
@@ -207,6 +247,30 @@ export function useSiteAnalysisBuildingUse() {
   return {
     ...state,
     canRequest,
-    loadBuildingUse
+    loadBuildingInfo
+  };
+}
+
+export function useSiteAnalysisBuildingUse() {
+  const { loadBuildingInfo, ...state } = useSiteAnalysisBuildingInfoRequest({
+    endpoint: "/analysis/building-info/use",
+    label: "용도현황"
+  });
+
+  return {
+    ...state,
+    loadBuildingUse: loadBuildingInfo
+  };
+}
+
+export function useSiteAnalysisBuildingStructure() {
+  const { loadBuildingInfo, ...state } = useSiteAnalysisBuildingInfoRequest({
+    endpoint: "/analysis/building-info/structure",
+    label: "구조현황"
+  });
+
+  return {
+    ...state,
+    loadBuildingStructure: loadBuildingInfo
   };
 }

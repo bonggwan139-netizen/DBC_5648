@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLandRegister } from "./landRegisterState";
 import {
-  type BuildingUseChartRow,
-  type BuildingUseLayerItem,
-  type BuildingUseResponse,
-  type BuildingUseTableColumn,
-  type BuildingUseTableRow,
+  type BuildingInfoChartRow,
+  type BuildingInfoLayerItem,
+  type BuildingInfoResponse,
+  type BuildingInfoTableColumn,
+  type BuildingInfoTableRow,
+  useSiteAnalysisBuildingStructure,
   useSiteAnalysisBuildingUse
 } from "./siteAnalysisBuildingInfo";
 import { useSiteAnalysisAreaSummary } from "./siteAnalysisAreaSummary";
@@ -143,6 +144,13 @@ export function SiteAnalysisDetailPanel() {
     loadBuildingUse,
     status: buildingUseStatus
   } = useSiteAnalysisBuildingUse();
+  const {
+    canRequest: canRequestBuildingStructure,
+    data: buildingStructureData,
+    error: buildingStructureError,
+    loadBuildingStructure,
+    status: buildingStructureStatus
+  } = useSiteAnalysisBuildingStructure();
   const [collapsed, setCollapsed] = useState(false);
   const locationRows = buildSiteAnalysisLocationRows(data);
 
@@ -200,6 +208,16 @@ export function SiteAnalysisDetailPanel() {
     }
   }, [activeDetailItem, buildingUseStatus, canRequestBuildingUse, loadBuildingUse]);
 
+  useEffect(() => {
+    if (
+      canRequestBuildingStructure &&
+      activeDetailItem === "buildingStructure" &&
+      buildingStructureStatus === "idle"
+    ) {
+      void loadBuildingStructure();
+    }
+  }, [activeDetailItem, buildingStructureStatus, canRequestBuildingStructure, loadBuildingStructure]);
+
   const activeThematicMapFeatures =
     activeDetailItem === "basicLandCategory"
       ? landCategoryData?.map_features ?? null
@@ -215,7 +233,9 @@ export function SiteAnalysisDetailPanel() {
                 ? roadSideData?.map_features ?? null
                 : activeDetailItem === "buildingUse"
                   ? buildingUseData?.map_features ?? null
-                : null;
+                  : activeDetailItem === "buildingStructure"
+                    ? buildingStructureData?.map_features ?? null
+                    : null;
 
   useEffect(() => {
     if (!canOpen || !activeDetailItem) {
@@ -231,7 +251,11 @@ export function SiteAnalysisDetailPanel() {
   }
 
   const panelTitle =
-    activeDetailItem === "basicLocationInfo" ? "위치정보" : activeDetailItem === "buildingUse" ? "건축물정보" : "토지정보";
+    activeDetailItem === "basicLocationInfo"
+      ? "위치정보"
+      : activeDetailItem === "buildingUse" || activeDetailItem === "buildingStructure"
+        ? "건축물정보"
+        : "토지정보";
 
   return (
     <motion.aside
@@ -266,7 +290,27 @@ export function SiteAnalysisDetailPanel() {
           {activeDetailItem === "basicLocationInfo" ? (
             <LocationInfoContent error={error} locationRows={locationRows} status={status} />
           ) : activeDetailItem === "buildingUse" ? (
-            <BuildingUseContent data={buildingUseData} error={buildingUseError} status={buildingUseStatus} />
+            <BuildingInfoContent
+              categorySummaryLabel="용도 분류 수"
+              data={buildingUseData}
+              emptyChartMessage="표시할 용도 차트가 없습니다."
+              error={buildingUseError}
+              errorMessage="용도현황을 불러오지 못했습니다."
+              fallbackTitle="용도현황"
+              loadingMessage="용도현황을 불러오는 중입니다."
+              status={buildingUseStatus}
+            />
+          ) : activeDetailItem === "buildingStructure" ? (
+            <BuildingInfoContent
+              categorySummaryLabel="구조 분류 수"
+              data={buildingStructureData}
+              emptyChartMessage="표시할 구조 차트가 없습니다."
+              error={buildingStructureError}
+              errorMessage="구조현황을 불러오지 못했습니다."
+              fallbackTitle="구조현황"
+              loadingMessage="구조현황을 불러오는 중입니다."
+              status={buildingStructureStatus}
+            />
           ) : activeDetailItem === "basicOwnership" ? (
             <CategoryAnalysisContent
               data={ownershipData}
@@ -393,8 +437,8 @@ function LocationInfoContent({
   );
 }
 
-const buildingUseColumnKeys = ["color", "label", "main_building_count", "ratio_percent", "accessory_building_count"];
-const fallbackBuildingUseColumns: BuildingUseTableColumn[] = [
+const buildingInfoColumnKeys = ["color", "label", "main_building_count", "ratio_percent", "accessory_building_count"];
+const fallbackBuildingInfoColumns: BuildingInfoTableColumn[] = [
   { key: "color", label: "범례", type: "color" },
   { key: "label", label: "구분", type: "text" },
   { key: "main_building_count", label: "주건축물(동)", type: "number" },
@@ -402,21 +446,31 @@ const fallbackBuildingUseColumns: BuildingUseTableColumn[] = [
   { key: "accessory_building_count", label: "부속건축물(동)", type: "number" }
 ];
 
-function getBuildingUseColumns(data: BuildingUseResponse) {
-  const columns = data.table.columns.filter((column) => buildingUseColumnKeys.includes(column.key));
-  return columns.length > 0 ? columns : fallbackBuildingUseColumns;
+function getBuildingInfoColumns(data: BuildingInfoResponse) {
+  const columns = data.table.columns.filter((column) => buildingInfoColumnKeys.includes(column.key));
+  return columns.length > 0 ? columns : fallbackBuildingInfoColumns;
 }
 
-function BuildingUseContent({
+function BuildingInfoContent({
+  categorySummaryLabel,
   data,
+  emptyChartMessage,
   error,
+  errorMessage,
+  fallbackTitle,
+  loadingMessage,
   status
 }: {
-  data: BuildingUseResponse | null;
+  categorySummaryLabel: string;
+  data: BuildingInfoResponse | null;
+  emptyChartMessage: string;
   error: string | null;
+  errorMessage: string;
+  fallbackTitle: string;
+  loadingMessage: string;
   status: "idle" | "loading" | "success" | "error" | "empty";
 }) {
-  const title = data?.title ?? "용도현황";
+  const title = data?.title ?? fallbackTitle;
   const breadcrumb = data?.breadcrumb?.join(" > ");
 
   return (
@@ -428,19 +482,19 @@ function BuildingUseContent({
 
       {status === "loading" ? (
         <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
-          용도현황을 불러오는 중입니다.
+          {loadingMessage}
         </p>
       ) : null}
 
       {status === "error" ? (
         <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-[12px] text-rose-700">
-          {error ?? "용도현황을 불러오지 못했습니다."}
+          {error ?? errorMessage}
         </p>
       ) : null}
 
       {(status === "success" || status === "empty") && data ? (
         <div className="mt-4 flex flex-col gap-4">
-          <BuildingUseSummaryCards data={data} />
+          <BuildingInfoSummaryCards categorySummaryLabel={categorySummaryLabel} data={data} />
 
           {status === "empty" ? (
             <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
@@ -448,9 +502,9 @@ function BuildingUseContent({
             </p>
           ) : null}
 
-          <BuildingUseTableView data={data} />
-          <BuildingUseChartView rows={data.chart.rows} />
-          <BuildingUseLayerList layers={data.layers} />
+          <BuildingInfoTableView data={data} emptyMessage={`표시할 ${fallbackTitle}이 없습니다.`} />
+          <BuildingInfoChartView emptyMessage={emptyChartMessage} rows={data.chart.rows} title={data.chart.title} />
+          <BuildingInfoLayerList layers={data.layers} />
 
           {data.warnings.length > 0 ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">
@@ -465,10 +519,16 @@ function BuildingUseContent({
   );
 }
 
-function BuildingUseSummaryCards({ data }: { data: BuildingUseResponse }) {
+function BuildingInfoSummaryCards({
+  categorySummaryLabel,
+  data
+}: {
+  categorySummaryLabel: string;
+  data: BuildingInfoResponse;
+}) {
   const cards = [
     { label: "건축물 수", value: data.summary.building_count },
-    { label: "용도 분류 수", value: data.summary.category_count },
+    { label: categorySummaryLabel, value: data.summary.category_count },
     { label: "주건축물 수", value: data.summary.main_building_count },
     { label: "부속건축물 수", value: data.summary.accessory_building_count }
   ];
@@ -485,8 +545,14 @@ function BuildingUseSummaryCards({ data }: { data: BuildingUseResponse }) {
   );
 }
 
-function BuildingUseTableView({ data }: { data: BuildingUseResponse }) {
-  const columns = getBuildingUseColumns(data);
+function BuildingInfoTableView({
+  data,
+  emptyMessage
+}: {
+  data: BuildingInfoResponse;
+  emptyMessage: string;
+}) {
+  const columns = getBuildingInfoColumns(data);
   const rows = data.table.total_row ? [...data.table.rows, data.table.total_row] : data.table.rows;
 
   return (
@@ -511,7 +577,7 @@ function BuildingUseTableView({ data }: { data: BuildingUseResponse }) {
                 <tr key={row.key} className={row.row_type === "total" ? "border-t-2 border-slate-300 bg-slate-50 font-semibold text-slate-900" : "font-medium"}>
                   {columns.map((column) => (
                     <td key={column.key} className="whitespace-nowrap px-3 py-2">
-                      {renderBuildingUseTableCell(row, column)}
+                      {renderBuildingInfoTableCell(row, column)}
                     </td>
                   ))}
                 </tr>
@@ -519,7 +585,7 @@ function BuildingUseTableView({ data }: { data: BuildingUseResponse }) {
             ) : (
               <tr>
                 <td colSpan={columns.length} className="px-3 py-4 text-center text-[12px] text-slate-500">
-                  표시할 용도현황이 없습니다.
+                  {emptyMessage}
                 </td>
               </tr>
             )}
@@ -537,7 +603,7 @@ function BuildingUseTableView({ data }: { data: BuildingUseResponse }) {
   );
 }
 
-function renderBuildingUseTableCell(row: BuildingUseTableRow, column: BuildingUseTableColumn) {
+function renderBuildingInfoTableCell(row: BuildingInfoTableRow, column: BuildingInfoTableColumn) {
   switch (column.key) {
     case "color":
       return row.color ? <span className="block h-3 w-3 rounded-full" style={{ backgroundColor: row.color }} /> : "-";
@@ -554,11 +620,19 @@ function renderBuildingUseTableCell(row: BuildingUseTableRow, column: BuildingUs
   }
 }
 
-function BuildingUseChartView({ rows }: { rows: BuildingUseChartRow[] }) {
+function BuildingInfoChartView({
+  emptyMessage,
+  rows,
+  title
+}: {
+  emptyMessage: string;
+  rows: BuildingInfoChartRow[];
+  title: string;
+}) {
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
-        표시할 용도 차트가 없습니다.
+        {emptyMessage}
       </p>
     );
   }
@@ -568,9 +642,9 @@ function BuildingUseChartView({ rows }: { rows: BuildingUseChartRow[] }) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <p className="mb-3 text-sm font-semibold text-slate-800">용도 차트</p>
+      <p className="mb-3 text-sm font-semibold text-slate-800">{title}</p>
       <div className="flex items-center gap-5">
-        <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" role="img" aria-label="용도 차트">
+        <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" role="img" aria-label={title}>
           <circle cx="60" cy="60" r="42" fill="#f8fafc" />
           {rows.map((row) => {
             const ratio =
@@ -619,7 +693,7 @@ function BuildingUseChartView({ rows }: { rows: BuildingUseChartRow[] }) {
   );
 }
 
-function BuildingUseLayerList({ layers }: { layers: BuildingUseResponse["layers"] }) {
+function BuildingInfoLayerList({ layers }: { layers: BuildingInfoResponse["layers"] }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">사용자레이어</p>
@@ -629,7 +703,7 @@ function BuildingUseLayerList({ layers }: { layers: BuildingUseResponse["layers"
       {layers.items.length > 0 ? (
         <ul className="mt-3 space-y-2">
           {layers.items.map((item) => (
-            <BuildingUseLayerItemRow key={item.key} item={item} />
+            <BuildingInfoLayerItemRow key={item.key} item={item} />
           ))}
         </ul>
       ) : (
@@ -641,7 +715,7 @@ function BuildingUseLayerList({ layers }: { layers: BuildingUseResponse["layers"
   );
 }
 
-function BuildingUseLayerItemRow({ item }: { item: BuildingUseLayerItem }) {
+function BuildingInfoLayerItemRow({ item }: { item: BuildingInfoLayerItem }) {
   return (
     <li className="flex items-center justify-between gap-3 text-[12px] text-slate-600">
       <span className="flex min-w-0 items-center gap-2">

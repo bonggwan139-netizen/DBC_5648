@@ -21,6 +21,10 @@ export type SiteAnalysisMapFeatureProperties = {
   feature_type?: string;
   analysis_type?: string;
   building_uid?: string;
+  code?: string | null;
+  group_code?: string | null;
+  structure_cd?: string | null;
+  structure_nm?: string | null;
 };
 
 export type SiteAnalysisMapFeatureCollection = {
