@@ -13,6 +13,16 @@ export type BuildingInfoSummary = {
   accessory_building_count: number;
   unknown_use_count?: number;
   unknown_structure_count?: number;
+  unknown_floor_count?: number;
+  unknown_age_count?: number;
+  pre_1900_count?: number;
+  unknown_area_count?: number;
+  negative_area_count?: number;
+  over_100000_area_count?: number;
+  unknown_coverage_count?: number;
+  over_100_coverage_count?: number;
+  unknown_far_count?: number;
+  over_2000_far_count?: number;
   selection_geometry: string;
   display_geometry: string;
 };
@@ -79,7 +89,15 @@ export type BuildingInfoLayers = {
 
 export type BuildingInfoMapFeatureProperties = {
   feature_type: "building" | string;
-  analysis_type: "building-use" | "building-structure" | string;
+  analysis_type:
+    | "building-use"
+    | "building-structure"
+    | "building-floor"
+    | "building-age"
+    | "building-gross-floor-area"
+    | "building-coverage-ratio"
+    | "building-floor-area-ratio"
+    | string;
   building_uid?: string;
   pnu?: string;
   key: string;
@@ -89,6 +107,12 @@ export type BuildingInfoMapFeatureProperties = {
   color: string;
   structure_cd?: string | null;
   structure_nm?: string | null;
+  floor_count?: number | null;
+  age_years?: number | null;
+  approval_year?: number | null;
+  gross_floor_area_m2?: number | null;
+  building_coverage_ratio?: number | null;
+  floor_area_ratio?: number | null;
 };
 
 export type BuildingInfoMapFeatureCollection = {
@@ -103,7 +127,15 @@ export type BuildingInfoMapFeatureCollection = {
 export type BuildingInfoDiagnostics = Record<string, unknown>;
 
 export type BuildingInfoResponse = {
-  analysis_type: "building-use" | "building-structure" | string;
+  analysis_type:
+    | "building-use"
+    | "building-structure"
+    | "building-floor"
+    | "building-age"
+    | "building-gross-floor-area"
+    | "building-coverage-ratio"
+    | "building-floor-area-ratio"
+    | string;
   title: string;
   breadcrumb: string[];
   summary: BuildingInfoSummary;
@@ -141,6 +173,71 @@ export type BuildingStructureMapFeatureCollection = BuildingInfoMapFeatureCollec
 export type BuildingStructureDiagnostics = BuildingInfoDiagnostics;
 export type BuildingStructureResponse = BuildingInfoResponse;
 
+export type BuildingFloorSummary = BuildingInfoSummary;
+export type BuildingFloorTableColumn = BuildingInfoTableColumn;
+export type BuildingFloorTableRow = BuildingInfoTableRow;
+export type BuildingFloorTable = BuildingInfoTable;
+export type BuildingFloorChartRow = BuildingInfoChartRow;
+export type BuildingFloorChart = BuildingInfoChart;
+export type BuildingFloorLayerItem = BuildingInfoLayerItem;
+export type BuildingFloorLayers = BuildingInfoLayers;
+export type BuildingFloorMapFeatureProperties = BuildingInfoMapFeatureProperties;
+export type BuildingFloorMapFeatureCollection = BuildingInfoMapFeatureCollection;
+export type BuildingFloorDiagnostics = BuildingInfoDiagnostics;
+export type BuildingFloorResponse = BuildingInfoResponse;
+
+export type BuildingAgeSummary = BuildingInfoSummary;
+export type BuildingAgeTableColumn = BuildingInfoTableColumn;
+export type BuildingAgeTableRow = BuildingInfoTableRow;
+export type BuildingAgeTable = BuildingInfoTable;
+export type BuildingAgeChartRow = BuildingInfoChartRow;
+export type BuildingAgeChart = BuildingInfoChart;
+export type BuildingAgeLayerItem = BuildingInfoLayerItem;
+export type BuildingAgeLayers = BuildingInfoLayers;
+export type BuildingAgeMapFeatureProperties = BuildingInfoMapFeatureProperties;
+export type BuildingAgeMapFeatureCollection = BuildingInfoMapFeatureCollection;
+export type BuildingAgeDiagnostics = BuildingInfoDiagnostics;
+export type BuildingAgeResponse = BuildingInfoResponse;
+
+export type BuildingGrossFloorAreaSummary = BuildingInfoSummary;
+export type BuildingGrossFloorAreaTableColumn = BuildingInfoTableColumn;
+export type BuildingGrossFloorAreaTableRow = BuildingInfoTableRow;
+export type BuildingGrossFloorAreaTable = BuildingInfoTable;
+export type BuildingGrossFloorAreaChartRow = BuildingInfoChartRow;
+export type BuildingGrossFloorAreaChart = BuildingInfoChart;
+export type BuildingGrossFloorAreaLayerItem = BuildingInfoLayerItem;
+export type BuildingGrossFloorAreaLayers = BuildingInfoLayers;
+export type BuildingGrossFloorAreaMapFeatureProperties = BuildingInfoMapFeatureProperties;
+export type BuildingGrossFloorAreaMapFeatureCollection = BuildingInfoMapFeatureCollection;
+export type BuildingGrossFloorAreaDiagnostics = BuildingInfoDiagnostics;
+export type BuildingGrossFloorAreaResponse = BuildingInfoResponse;
+
+export type BuildingCoverageRatioSummary = BuildingInfoSummary;
+export type BuildingCoverageRatioTableColumn = BuildingInfoTableColumn;
+export type BuildingCoverageRatioTableRow = BuildingInfoTableRow;
+export type BuildingCoverageRatioTable = BuildingInfoTable;
+export type BuildingCoverageRatioChartRow = BuildingInfoChartRow;
+export type BuildingCoverageRatioChart = BuildingInfoChart;
+export type BuildingCoverageRatioLayerItem = BuildingInfoLayerItem;
+export type BuildingCoverageRatioLayers = BuildingInfoLayers;
+export type BuildingCoverageRatioMapFeatureProperties = BuildingInfoMapFeatureProperties;
+export type BuildingCoverageRatioMapFeatureCollection = BuildingInfoMapFeatureCollection;
+export type BuildingCoverageRatioDiagnostics = BuildingInfoDiagnostics;
+export type BuildingCoverageRatioResponse = BuildingInfoResponse;
+
+export type BuildingFloorAreaRatioSummary = BuildingInfoSummary;
+export type BuildingFloorAreaRatioTableColumn = BuildingInfoTableColumn;
+export type BuildingFloorAreaRatioTableRow = BuildingInfoTableRow;
+export type BuildingFloorAreaRatioTable = BuildingInfoTable;
+export type BuildingFloorAreaRatioChartRow = BuildingInfoChartRow;
+export type BuildingFloorAreaRatioChart = BuildingInfoChart;
+export type BuildingFloorAreaRatioLayerItem = BuildingInfoLayerItem;
+export type BuildingFloorAreaRatioLayers = BuildingInfoLayers;
+export type BuildingFloorAreaRatioMapFeatureProperties = BuildingInfoMapFeatureProperties;
+export type BuildingFloorAreaRatioMapFeatureCollection = BuildingInfoMapFeatureCollection;
+export type BuildingFloorAreaRatioDiagnostics = BuildingInfoDiagnostics;
+export type BuildingFloorAreaRatioResponse = BuildingInfoResponse;
+
 type BuildingInfoStatus = "idle" | "loading" | "success" | "error" | "empty";
 
 type BuildingInfoState = {
@@ -159,7 +256,14 @@ function useSiteAnalysisBuildingInfoRequest({
   endpoint,
   label
 }: {
-  endpoint: "/analysis/building-info/use" | "/analysis/building-info/structure";
+  endpoint:
+    | "/analysis/building-info/use"
+    | "/analysis/building-info/structure"
+    | "/analysis/building-info/floor"
+    | "/analysis/building-info/age"
+    | "/analysis/building-info/gross-floor-area"
+    | "/analysis/building-info/building-coverage-ratio"
+    | "/analysis/building-info/floor-area-ratio";
   label: string;
 }) {
   const { state: zoneState } = useZoneSelection();
@@ -272,5 +376,65 @@ export function useSiteAnalysisBuildingStructure() {
   return {
     ...state,
     loadBuildingStructure: loadBuildingInfo
+  };
+}
+
+export function useSiteAnalysisBuildingFloor() {
+  const { loadBuildingInfo, ...state } = useSiteAnalysisBuildingInfoRequest({
+    endpoint: "/analysis/building-info/floor",
+    label: "층수현황"
+  });
+
+  return {
+    ...state,
+    loadBuildingFloor: loadBuildingInfo
+  };
+}
+
+export function useSiteAnalysisBuildingAge() {
+  const { loadBuildingInfo, ...state } = useSiteAnalysisBuildingInfoRequest({
+    endpoint: "/analysis/building-info/age",
+    label: "경과년도"
+  });
+
+  return {
+    ...state,
+    loadBuildingAge: loadBuildingInfo
+  };
+}
+
+export function useSiteAnalysisBuildingGrossFloorArea() {
+  const { loadBuildingInfo, ...state } = useSiteAnalysisBuildingInfoRequest({
+    endpoint: "/analysis/building-info/gross-floor-area",
+    label: "연면적현황"
+  });
+
+  return {
+    ...state,
+    loadBuildingGrossFloorArea: loadBuildingInfo
+  };
+}
+
+export function useSiteAnalysisBuildingCoverageRatio() {
+  const { loadBuildingInfo, ...state } = useSiteAnalysisBuildingInfoRequest({
+    endpoint: "/analysis/building-info/building-coverage-ratio",
+    label: "건폐율현황"
+  });
+
+  return {
+    ...state,
+    loadBuildingCoverageRatio: loadBuildingInfo
+  };
+}
+
+export function useSiteAnalysisBuildingFloorAreaRatio() {
+  const { loadBuildingInfo, ...state } = useSiteAnalysisBuildingInfoRequest({
+    endpoint: "/analysis/building-info/floor-area-ratio",
+    label: "용적률현황"
+  });
+
+  return {
+    ...state,
+    loadBuildingFloorAreaRatio: loadBuildingInfo
   };
 }

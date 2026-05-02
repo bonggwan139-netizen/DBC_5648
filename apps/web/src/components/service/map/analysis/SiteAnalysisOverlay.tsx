@@ -33,7 +33,11 @@ const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
     items: [
       { label: "용도현황", detailItem: "buildingUse" },
       { label: "구조현황", detailItem: "buildingStructure" },
-      ...["층수현황", "경과년도", "연면적현황", "건폐율현황", "용적률현황"].map((label) => ({ label }))
+      { label: "층수현황", detailItem: "buildingFloor" },
+      { label: "경과년도", detailItem: "buildingAge" },
+      { label: "연면적현황", detailItem: "buildingGrossFloorArea" },
+      { label: "건폐율현황", detailItem: "buildingCoverageRatio" },
+      { label: "용적률현황", detailItem: "buildingFloorAreaRatio" }
     ]
   },
   {

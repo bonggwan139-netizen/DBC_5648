@@ -25,6 +25,12 @@ export type SiteAnalysisMapFeatureProperties = {
   group_code?: string | null;
   structure_cd?: string | null;
   structure_nm?: string | null;
+  floor_count?: number | null;
+  age_years?: number | null;
+  approval_year?: number | null;
+  gross_floor_area_m2?: number | null;
+  building_coverage_ratio?: number | null;
+  floor_area_ratio?: number | null;
 };
 
 export type SiteAnalysisMapFeatureCollection = {

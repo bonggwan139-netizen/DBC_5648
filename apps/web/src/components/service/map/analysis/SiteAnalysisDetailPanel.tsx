@@ -9,6 +9,11 @@ import {
   type BuildingInfoResponse,
   type BuildingInfoTableColumn,
   type BuildingInfoTableRow,
+  useSiteAnalysisBuildingAge,
+  useSiteAnalysisBuildingCoverageRatio,
+  useSiteAnalysisBuildingFloor,
+  useSiteAnalysisBuildingFloorAreaRatio,
+  useSiteAnalysisBuildingGrossFloorArea,
   useSiteAnalysisBuildingStructure,
   useSiteAnalysisBuildingUse
 } from "./siteAnalysisBuildingInfo";
@@ -151,6 +156,41 @@ export function SiteAnalysisDetailPanel() {
     loadBuildingStructure,
     status: buildingStructureStatus
   } = useSiteAnalysisBuildingStructure();
+  const {
+    canRequest: canRequestBuildingFloor,
+    data: buildingFloorData,
+    error: buildingFloorError,
+    loadBuildingFloor,
+    status: buildingFloorStatus
+  } = useSiteAnalysisBuildingFloor();
+  const {
+    canRequest: canRequestBuildingAge,
+    data: buildingAgeData,
+    error: buildingAgeError,
+    loadBuildingAge,
+    status: buildingAgeStatus
+  } = useSiteAnalysisBuildingAge();
+  const {
+    canRequest: canRequestBuildingGrossFloorArea,
+    data: buildingGrossFloorAreaData,
+    error: buildingGrossFloorAreaError,
+    loadBuildingGrossFloorArea,
+    status: buildingGrossFloorAreaStatus
+  } = useSiteAnalysisBuildingGrossFloorArea();
+  const {
+    canRequest: canRequestBuildingCoverageRatio,
+    data: buildingCoverageRatioData,
+    error: buildingCoverageRatioError,
+    loadBuildingCoverageRatio,
+    status: buildingCoverageRatioStatus
+  } = useSiteAnalysisBuildingCoverageRatio();
+  const {
+    canRequest: canRequestBuildingFloorAreaRatio,
+    data: buildingFloorAreaRatioData,
+    error: buildingFloorAreaRatioError,
+    loadBuildingFloorAreaRatio,
+    status: buildingFloorAreaRatioStatus
+  } = useSiteAnalysisBuildingFloorAreaRatio();
   const [collapsed, setCollapsed] = useState(false);
   const locationRows = buildSiteAnalysisLocationRows(data);
 
@@ -218,6 +258,58 @@ export function SiteAnalysisDetailPanel() {
     }
   }, [activeDetailItem, buildingStructureStatus, canRequestBuildingStructure, loadBuildingStructure]);
 
+  useEffect(() => {
+    if (canRequestBuildingFloor && activeDetailItem === "buildingFloor" && buildingFloorStatus === "idle") {
+      void loadBuildingFloor();
+    }
+  }, [activeDetailItem, buildingFloorStatus, canRequestBuildingFloor, loadBuildingFloor]);
+
+  useEffect(() => {
+    if (canRequestBuildingAge && activeDetailItem === "buildingAge" && buildingAgeStatus === "idle") {
+      void loadBuildingAge();
+    }
+  }, [activeDetailItem, buildingAgeStatus, canRequestBuildingAge, loadBuildingAge]);
+
+  useEffect(() => {
+    if (
+      canRequestBuildingGrossFloorArea &&
+      activeDetailItem === "buildingGrossFloorArea" &&
+      buildingGrossFloorAreaStatus === "idle"
+    ) {
+      void loadBuildingGrossFloorArea();
+    }
+  }, [
+    activeDetailItem,
+    buildingGrossFloorAreaStatus,
+    canRequestBuildingGrossFloorArea,
+    loadBuildingGrossFloorArea
+  ]);
+
+  useEffect(() => {
+    if (
+      canRequestBuildingCoverageRatio &&
+      activeDetailItem === "buildingCoverageRatio" &&
+      buildingCoverageRatioStatus === "idle"
+    ) {
+      void loadBuildingCoverageRatio();
+    }
+  }, [activeDetailItem, buildingCoverageRatioStatus, canRequestBuildingCoverageRatio, loadBuildingCoverageRatio]);
+
+  useEffect(() => {
+    if (
+      canRequestBuildingFloorAreaRatio &&
+      activeDetailItem === "buildingFloorAreaRatio" &&
+      buildingFloorAreaRatioStatus === "idle"
+    ) {
+      void loadBuildingFloorAreaRatio();
+    }
+  }, [
+    activeDetailItem,
+    buildingFloorAreaRatioStatus,
+    canRequestBuildingFloorAreaRatio,
+    loadBuildingFloorAreaRatio
+  ]);
+
   const activeThematicMapFeatures =
     activeDetailItem === "basicLandCategory"
       ? landCategoryData?.map_features ?? null
@@ -235,7 +327,17 @@ export function SiteAnalysisDetailPanel() {
                   ? buildingUseData?.map_features ?? null
                   : activeDetailItem === "buildingStructure"
                     ? buildingStructureData?.map_features ?? null
-                    : null;
+                    : activeDetailItem === "buildingFloor"
+                      ? buildingFloorData?.map_features ?? null
+                      : activeDetailItem === "buildingAge"
+                        ? buildingAgeData?.map_features ?? null
+                        : activeDetailItem === "buildingGrossFloorArea"
+                          ? buildingGrossFloorAreaData?.map_features ?? null
+                          : activeDetailItem === "buildingCoverageRatio"
+                            ? buildingCoverageRatioData?.map_features ?? null
+                            : activeDetailItem === "buildingFloorAreaRatio"
+                              ? buildingFloorAreaRatioData?.map_features ?? null
+                              : null;
 
   useEffect(() => {
     if (!canOpen || !activeDetailItem) {
@@ -253,7 +355,13 @@ export function SiteAnalysisDetailPanel() {
   const panelTitle =
     activeDetailItem === "basicLocationInfo"
       ? "위치정보"
-      : activeDetailItem === "buildingUse" || activeDetailItem === "buildingStructure"
+      : activeDetailItem === "buildingUse" ||
+          activeDetailItem === "buildingStructure" ||
+          activeDetailItem === "buildingFloor" ||
+          activeDetailItem === "buildingAge" ||
+          activeDetailItem === "buildingGrossFloorArea" ||
+          activeDetailItem === "buildingCoverageRatio" ||
+          activeDetailItem === "buildingFloorAreaRatio"
         ? "건축물정보"
         : "토지정보";
 
@@ -310,6 +418,88 @@ export function SiteAnalysisDetailPanel() {
               fallbackTitle="구조현황"
               loadingMessage="구조현황을 불러오는 중입니다."
               status={buildingStructureStatus}
+            />
+          ) : activeDetailItem === "buildingFloor" ? (
+            <BuildingInfoContent
+              categorySummaryLabel="분류 수"
+              data={buildingFloorData}
+              emptyChartMessage="표시할 층수 차트가 없습니다."
+              error={buildingFloorError}
+              errorMessage="층수현황을 불러오지 못했습니다."
+              extraSummaryCards={(buildingData) => [
+                { label: "정보없음", value: buildingData.summary.unknown_floor_count ?? 0 }
+              ]}
+              fallbackTitle="층수현황"
+              loadingMessage="층수현황을 불러오는 중입니다."
+              status={buildingFloorStatus}
+            />
+          ) : activeDetailItem === "buildingAge" ? (
+            <BuildingInfoContent
+              categorySummaryLabel="분류 수"
+              data={buildingAgeData}
+              emptyChartMessage="표시할 경과년도 차트가 없습니다."
+              error={buildingAgeError}
+              errorMessage="경과년도를 불러오지 못했습니다."
+              extraSummaryCards={(buildingData) => [
+                { label: "정보없음", value: buildingData.summary.unknown_age_count ?? 0 },
+                ...(buildingData.summary.pre_1900_count && buildingData.summary.pre_1900_count > 0
+                  ? [{ label: "1900년 이전", value: buildingData.summary.pre_1900_count }]
+                  : [])
+              ]}
+              fallbackTitle="경과년도"
+              loadingMessage="경과년도를 불러오는 중입니다."
+              status={buildingAgeStatus}
+            />
+          ) : activeDetailItem === "buildingGrossFloorArea" ? (
+            <BuildingInfoContent
+              categorySummaryLabel="분류 수"
+              data={buildingGrossFloorAreaData}
+              emptyChartMessage="표시할 연면적 차트가 없습니다."
+              error={buildingGrossFloorAreaError}
+              errorMessage="연면적현황을 불러오지 못했습니다."
+              extraSummaryCards={(buildingData) => [
+                { label: "정보없음", value: buildingData.summary.unknown_area_count ?? 0 },
+                ...(buildingData.summary.over_100000_area_count && buildingData.summary.over_100000_area_count > 0
+                  ? [{ label: "100,000㎡ 초과", value: buildingData.summary.over_100000_area_count }]
+                  : [])
+              ]}
+              fallbackTitle="연면적현황"
+              loadingMessage="연면적현황을 불러오는 중입니다."
+              status={buildingGrossFloorAreaStatus}
+            />
+          ) : activeDetailItem === "buildingCoverageRatio" ? (
+            <BuildingInfoContent
+              categorySummaryLabel="분류 수"
+              data={buildingCoverageRatioData}
+              emptyChartMessage="표시할 건폐율 차트가 없습니다."
+              error={buildingCoverageRatioError}
+              errorMessage="건폐율현황을 불러오지 못했습니다."
+              extraSummaryCards={(buildingData) => [
+                { label: "정보없음", value: buildingData.summary.unknown_coverage_count ?? 0 },
+                ...(buildingData.summary.over_100_coverage_count && buildingData.summary.over_100_coverage_count > 0
+                  ? [{ label: "100% 초과", value: buildingData.summary.over_100_coverage_count }]
+                  : [])
+              ]}
+              fallbackTitle="건폐율현황"
+              loadingMessage="건폐율현황을 불러오는 중입니다."
+              status={buildingCoverageRatioStatus}
+            />
+          ) : activeDetailItem === "buildingFloorAreaRatio" ? (
+            <BuildingInfoContent
+              categorySummaryLabel="분류 수"
+              data={buildingFloorAreaRatioData}
+              emptyChartMessage="표시할 용적률 차트가 없습니다."
+              error={buildingFloorAreaRatioError}
+              errorMessage="용적률현황을 불러오지 못했습니다."
+              extraSummaryCards={(buildingData) => [
+                { label: "정보없음", value: buildingData.summary.unknown_far_count ?? 0 },
+                ...(buildingData.summary.over_2000_far_count && buildingData.summary.over_2000_far_count > 0
+                  ? [{ label: "2000% 초과", value: buildingData.summary.over_2000_far_count }]
+                  : [])
+              ]}
+              fallbackTitle="용적률현황"
+              loadingMessage="용적률현황을 불러오는 중입니다."
+              status={buildingFloorAreaRatioStatus}
             />
           ) : activeDetailItem === "basicOwnership" ? (
             <CategoryAnalysisContent
@@ -445,6 +635,10 @@ const fallbackBuildingInfoColumns: BuildingInfoTableColumn[] = [
   { key: "ratio_percent", label: "구성비(%)", type: "percent" },
   { key: "accessory_building_count", label: "부속건축물(동)", type: "number" }
 ];
+type BuildingInfoSummaryCard = {
+  label: string;
+  value: number;
+};
 
 function getBuildingInfoColumns(data: BuildingInfoResponse) {
   const columns = data.table.columns.filter((column) => buildingInfoColumnKeys.includes(column.key));
@@ -457,6 +651,7 @@ function BuildingInfoContent({
   emptyChartMessage,
   error,
   errorMessage,
+  extraSummaryCards,
   fallbackTitle,
   loadingMessage,
   status
@@ -466,6 +661,7 @@ function BuildingInfoContent({
   emptyChartMessage: string;
   error: string | null;
   errorMessage: string;
+  extraSummaryCards?: (data: BuildingInfoResponse) => BuildingInfoSummaryCard[];
   fallbackTitle: string;
   loadingMessage: string;
   status: "idle" | "loading" | "success" | "error" | "empty";
@@ -494,7 +690,11 @@ function BuildingInfoContent({
 
       {(status === "success" || status === "empty") && data ? (
         <div className="mt-4 flex flex-col gap-4">
-          <BuildingInfoSummaryCards categorySummaryLabel={categorySummaryLabel} data={data} />
+          <BuildingInfoSummaryCards
+            categorySummaryLabel={categorySummaryLabel}
+            data={data}
+            extraCards={extraSummaryCards?.(data) ?? []}
+          />
 
           {status === "empty" ? (
             <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
@@ -521,16 +721,19 @@ function BuildingInfoContent({
 
 function BuildingInfoSummaryCards({
   categorySummaryLabel,
-  data
+  data,
+  extraCards
 }: {
   categorySummaryLabel: string;
   data: BuildingInfoResponse;
+  extraCards: BuildingInfoSummaryCard[];
 }) {
   const cards = [
     { label: "건축물 수", value: data.summary.building_count },
     { label: categorySummaryLabel, value: data.summary.category_count },
     { label: "주건축물 수", value: data.summary.main_building_count },
-    { label: "부속건축물 수", value: data.summary.accessory_building_count }
+    { label: "부속건축물 수", value: data.summary.accessory_building_count },
+    ...extraCards
   ];
 
   return (

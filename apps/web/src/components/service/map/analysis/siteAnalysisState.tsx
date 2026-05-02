@@ -15,7 +15,12 @@ export type SiteAnalysisDetailItem =
   | "basicTerrainShape"
   | "basicRoadSide"
   | "buildingUse"
-  | "buildingStructure";
+  | "buildingStructure"
+  | "buildingFloor"
+  | "buildingAge"
+  | "buildingGrossFloorArea"
+  | "buildingCoverageRatio"
+  | "buildingFloorAreaRatio";
 
 type SiteAnalysisContextValue = {
   activeSection: SiteAnalysisTopSection | null;
