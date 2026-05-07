@@ -5,7 +5,7 @@ DBC-5648 is a web-based urban planning analysis project.
 The main service, **DBC-MAP**, is designed as a practical spatial analysis workspace for urban planning review.  
 It aims to support site understanding, parcel-based review, map interaction, land/building information analysis, and report-oriented workflows.
 
-> Current focus: layout-first rebuilding and stable expansion of the DBC-MAP service shell.
+> Current focus: reorganizing the current DBC-MAP structure and development rules before adding more features.
 
 ---
 
