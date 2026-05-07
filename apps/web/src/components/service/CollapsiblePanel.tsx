@@ -13,6 +13,8 @@ const siteAnalysisActions: Array<{ section: SiteAnalysisSection; label: string }
   { section: "locationAnalysis", label: "입지분석" }
 ];
 
+type PendingShpImport = Awaited<ReturnType<typeof parseZoneShpZipFile>>;
+
 function formatReportTimestamp(date: Date) {
   const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -78,10 +80,17 @@ function logReportCaptureWarning(message: string, error: unknown) {
 
 export function CollapsiblePanel() {
   const shpInputRef = useRef<HTMLInputElement | null>(null);
+  const shpConfirmLockRef = useRef(false);
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isWordReportDownloading, setIsWordReportDownloading] = useState(false);
   const [isShpImporting, setIsShpImporting] = useState(false);
+  const [isShpImportCardOpen, setIsShpImportCardOpen] = useState(false);
+  const [pendingShpImport, setPendingShpImport] = useState<PendingShpImport | null>(null);
+  const [shpImportMessage, setShpImportMessage] = useState<{
+    tone: "error" | "success";
+    text: string;
+  } | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportWarning, setReportWarning] = useState<string | null>(null);
   const { state: searchState, submitSearch } = useMapSearch();
@@ -95,7 +104,6 @@ export function CollapsiblePanel() {
     activateParcelMode,
     activateDrawMode,
     importShpGeometries,
-    setFeedback: setZoneSelectionFeedback,
     undoSelection,
     cancelSelection,
     confirmSelection,
@@ -119,6 +127,36 @@ export function CollapsiblePanel() {
     shpInputRef.current?.click();
   };
 
+  const handleOpenShpImportCard = () => {
+    setIsShpImportCardOpen(true);
+  };
+
+  const handleCancelShpImport = () => {
+    if (isShpImporting) {
+      return;
+    }
+
+    setPendingShpImport(null);
+    setShpImportMessage(null);
+    setIsShpImportCardOpen(false);
+  };
+
+  const handleConfirmShpImport = () => {
+    if (!pendingShpImport || isShpImporting || shpConfirmLockRef.current) {
+      return;
+    }
+
+    shpConfirmLockRef.current = true;
+    const importToApply = pendingShpImport;
+    setPendingShpImport(null);
+    setShpImportMessage(null);
+    setIsShpImportCardOpen(false);
+    importShpGeometries(importToApply);
+    queueMicrotask(() => {
+      shpConfirmLockRef.current = false;
+    });
+  };
+
   const handleShpFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     event.target.value = "";
@@ -128,13 +166,21 @@ export function CollapsiblePanel() {
     }
 
     setIsShpImporting(true);
-    setZoneSelectionFeedback(null);
+    setPendingShpImport(null);
+    setShpImportMessage(null);
 
     try {
       const result = await parseZoneShpZipFile(file);
-      importShpGeometries(result);
+      setPendingShpImport(result);
+      setShpImportMessage({
+        tone: "success",
+        text: `SHP 파일을 확인했습니다. (${result.metadata.featureCount}개) Confirm을 눌러 초안에 추가하세요.`
+      });
     } catch (error) {
-      setZoneSelectionFeedback(error instanceof Error ? error.message : "SHP ZIP 파일을 가져올 수 없습니다.");
+      setShpImportMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "SHP ZIP 파일을 가져올 수 없습니다."
+      });
     } finally {
       setIsShpImporting(false);
     }
@@ -280,10 +326,15 @@ export function CollapsiblePanel() {
             </section>
 
             <section className="rounded-2xl border border-stroke bg-white p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-700">구역 선택</p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="truncate text-sm font-semibold text-slate-700">구역 선택</p>
+                  <span className="shrink-0 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                    {modeBadgeLabel}
+                  </span>
+                </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={confirmSelection}
@@ -333,35 +384,18 @@ export function CollapsiblePanel() {
               </div>
 
               <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-                <div className="flex items-start gap-2">
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={activateParcelMode}
-                      className={`rounded-lg border px-3 py-1.5 text-[11px] font-medium transition ${
-                        isParcelActive
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      Parcel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenShpPicker}
-                      disabled={isShpImporting}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isShpImporting ? "SHP..." : "SHP"}
-                    </button>
-                    <input
-                      ref={shpInputRef}
-                      type="file"
-                      accept=".zip"
-                      className="hidden"
-                      onChange={handleShpFileChange}
-                    />
-                  </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={activateParcelMode}
+                    className={`rounded-lg border px-3 py-1.5 text-[11px] font-medium transition ${
+                      isParcelActive
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Parcel
+                  </button>
                   <button
                     type="button"
                     onClick={activateDrawMode}
@@ -373,10 +407,71 @@ export function CollapsiblePanel() {
                   >
                     Draw
                   </button>
-                  <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                    {modeBadgeLabel}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleOpenShpImportCard}
+                    disabled={isShpImporting}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    SHP
+                  </button>
+                  <input
+                    ref={shpInputRef}
+                    type="file"
+                    accept=".zip"
+                    className="hidden"
+                    onChange={handleShpFileChange}
+                  />
                 </div>
+
+                {isShpImportCardOpen ? (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={handleOpenShpPicker}
+                      disabled={isShpImporting}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isShpImporting ? "Import..." : "Import"}
+                    </button>
+
+                    <ul className="mt-3 space-y-1 text-[11px] leading-5 text-slate-600">
+                      <li>ZIP 파일만 가능 (.shp, .shx, .dbf, .prj 포함)</li>
+                      <li>EPSG:4326 좌표계만 가능</li>
+                      <li>Polygon / MultiPolygon만 가능</li>
+                      <li>20MB 이하만 가능</li>
+                    </ul>
+
+                    {shpImportMessage ? (
+                      <p
+                        className={`mt-3 text-[11px] ${
+                          shpImportMessage.tone === "error" ? "text-rose-600" : "text-blue-700"
+                        }`}
+                      >
+                        {shpImportMessage.text}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-3 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCancelShpImport}
+                        disabled={isShpImporting}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmShpImport}
+                        disabled={!pendingShpImport || isShpImporting}
+                        className="rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:border-blue-300 disabled:bg-blue-300 disabled:opacity-70"
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {detailLabel ? <p className="mt-2 text-[11px] text-slate-600">{detailLabel}</p> : null}
                 {feedback ? <p className="mt-2 text-[11px] text-rose-600">{feedback}</p> : null}
