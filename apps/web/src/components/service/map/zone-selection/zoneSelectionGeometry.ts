@@ -13,6 +13,7 @@ import type {
   DrawVertex,
   FinalizedZone,
   FinalizedZoneMode,
+  ImportedGeometryRecord,
   ParcelFeatureRecord,
   ZoneConfirmedFeatureCollection,
   ZoneDraftGeometryFeatureCollection,
@@ -135,6 +136,17 @@ export function mergeZoneGeometries(geometries: ZoneGeometry[]): ZoneGeometry | 
   return booleanValid(normalized) ? normalized : null;
 }
 
+export function getZoneGeometriesBbox(geometries: ZoneGeometry[]) {
+  if (geometries.length === 0) {
+    return null;
+  }
+
+  return bbox({
+    type: "FeatureCollection",
+    features: geometries.map((geometry) => createFeature(geometry, {}))
+  });
+}
+
 function createFinalizedZone(mode: FinalizedZoneMode, geometry: ZoneGeometry, sourceParcelIds?: string[]): FinalizedZone {
   const dedupedSourceIds =
     sourceParcelIds && sourceParcelIds.length > 0
@@ -155,17 +167,22 @@ function createFinalizedZone(mode: FinalizedZoneMode, geometry: ZoneGeometry, so
 export function createFinalizedDraftZone(params: {
   parcelRecords: ParcelFeatureRecord[];
   drawnGeometries: DrawGeometryRecord[];
+  importedGeometries: ImportedGeometryRecord[];
 }): FinalizedZone | null {
   const parcelGeometries = params.parcelRecords.map((record) => record.geometry);
   const drawnGeometries = params.drawnGeometries.map((record) => record.geometry);
-  const merged = mergeZoneGeometries([...parcelGeometries, ...drawnGeometries]);
+  const importedGeometries = params.importedGeometries.flatMap((record) => record.geometries);
+  const merged = mergeZoneGeometries([...parcelGeometries, ...drawnGeometries, ...importedGeometries]);
   if (!merged) {
     return null;
   }
 
   const hasParcels = params.parcelRecords.length > 0;
   const hasDrawnGeometries = params.drawnGeometries.length > 0;
-  const mode: FinalizedZoneMode = hasParcels && hasDrawnGeometries ? "mixed" : hasParcels ? "parcel" : "draw";
+  const hasImportedGeometries = params.importedGeometries.length > 0;
+  const inputModeCount = [hasParcels, hasDrawnGeometries, hasImportedGeometries].filter(Boolean).length;
+  const mode: FinalizedZoneMode =
+    inputModeCount > 1 ? "mixed" : hasParcels ? "parcel" : hasDrawnGeometries ? "draw" : "import";
 
   return createFinalizedZone(
     mode,
@@ -177,12 +194,14 @@ export function createFinalizedDraftZone(params: {
 export function createDraftUnionGeometryFeatureCollection(params: {
   parcelRecords: ParcelFeatureRecord[];
   drawnGeometries: DrawGeometryRecord[];
+  importedGeometries: ImportedGeometryRecord[];
 }): ZoneDraftGeometryFeatureCollection {
   const parcelGeometries = params.parcelRecords.map((record) => record.geometry);
   const drawnGeometries = params.drawnGeometries.map((record) => record.geometry);
+  const importedGeometries = params.importedGeometries.flatMap((record) => record.geometries);
 
   try {
-    const merged = mergeZoneGeometries([...parcelGeometries, ...drawnGeometries]);
+    const merged = mergeZoneGeometries([...parcelGeometries, ...drawnGeometries, ...importedGeometries]);
     if (!merged) {
       return createEmptyFeatureCollection();
     }

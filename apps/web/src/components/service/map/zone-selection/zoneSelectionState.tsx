@@ -5,6 +5,7 @@ import { createDrawGeometryRecord, createFinalizedDraftZone } from "./zoneSelect
 import type {
   DrawGeometryRecord,
   DrawVertex,
+  ImportedGeometryMetadata,
   ParcelFeatureRecord,
   ZoneDraftSnapshot,
   ZoneSelectionState,
@@ -15,6 +16,7 @@ type ZoneSelectionContextValue = {
   state: ZoneSelectionState;
   activateTool: (tool: ZoneSelectionTool) => void;
   toggleParcelSelection: (parcel: ParcelFeatureRecord) => void;
+  addImportedGeometries: (params: { geometries: DrawGeometryRecord["geometry"][]; metadata: ImportedGeometryMetadata }) => void;
   syncSelectedParcels: (parcels: ParcelFeatureRecord[]) => void;
   addDrawVertex: (vertex: DrawVertex) => void;
   completeDrawBoundary: () => void;
@@ -28,6 +30,7 @@ type ZoneSelectionContextValue = {
 type ZoneSelectionAction =
   | { type: "ACTIVATE_TOOL"; tool: ZoneSelectionTool }
   | { type: "TOGGLE_PARCEL"; parcel: ParcelFeatureRecord }
+  | { type: "ADD_IMPORTED_GEOMETRIES"; geometries: DrawGeometryRecord["geometry"][]; metadata: ImportedGeometryMetadata }
   | { type: "SYNC_SELECTED_PARCELS"; parcels: ParcelFeatureRecord[] }
   | { type: "ADD_DRAW_VERTEX"; vertex: DrawVertex }
   | { type: "COMPLETE_DRAW"; geometry: DrawGeometryRecord }
@@ -41,6 +44,7 @@ function createEmptyDraft(): ZoneSelectionState["draft"] {
     selectedParcelIds: [],
     parcelsById: {},
     drawnGeometries: [],
+    importedGeometries: [],
     drawVertices: [],
     history: []
   };
@@ -64,6 +68,11 @@ function cloneDraftSnapshot(snapshot: ZoneDraftSnapshot): ZoneDraftSnapshot {
       ...record,
       geometry: JSON.parse(JSON.stringify(record.geometry))
     })),
+    importedGeometries: snapshot.importedGeometries.map((record) => ({
+      ...record,
+      geometries: record.geometries.map((geometry) => JSON.parse(JSON.stringify(geometry))),
+      metadata: { ...record.metadata }
+    })),
     drawVertices: snapshot.drawVertices.map((vertex) => ({
       ...vertex,
       coordinate: [...vertex.coordinate]
@@ -76,6 +85,7 @@ function snapshotFromState(state: ZoneSelectionState): ZoneDraftSnapshot {
     selectedParcelIds: state.draft.selectedParcelIds,
     parcelsById: state.draft.parcelsById,
     drawnGeometries: state.draft.drawnGeometries,
+    importedGeometries: state.draft.importedGeometries,
     drawVertices: state.draft.drawVertices
   });
 }
@@ -149,6 +159,45 @@ function reducer(state: ZoneSelectionState, action: ZoneSelectionAction): ZoneSe
             [action.parcel.parcelId]: action.parcel
           },
           history: [...state.draft.history, snapshot]
+        },
+        feedback: null
+      };
+    }
+
+    case "ADD_IMPORTED_GEOMETRIES": {
+      if (action.geometries.length === 0) {
+        return {
+          ...state,
+          feedback: null
+        };
+      }
+
+      const baseState =
+        state.status === "confirmed"
+          ? {
+              ...createInitialState(),
+              status: "editing" as const,
+              activeTool: "parcel" as const
+            }
+          : state;
+      const snapshot = snapshotFromState(baseState);
+
+      return {
+        ...baseState,
+        status: "editing",
+        activeTool: baseState.activeTool ?? "parcel",
+        confirmedZone: null,
+        draft: {
+          ...baseState.draft,
+          importedGeometries: [
+            ...baseState.draft.importedGeometries,
+            {
+              id: `shp-import-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              geometries: action.geometries,
+              metadata: action.metadata
+            }
+          ],
+          history: [...baseState.draft.history, snapshot]
         },
         feedback: null
       };
@@ -309,6 +358,13 @@ export function ZoneSelectionProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "TOGGLE_PARCEL", parcel });
   }, []);
 
+  const addImportedGeometries = useCallback(
+    (params: { geometries: DrawGeometryRecord["geometry"][]; metadata: ImportedGeometryMetadata }) => {
+      dispatch({ type: "ADD_IMPORTED_GEOMETRIES", geometries: params.geometries, metadata: params.metadata });
+    },
+    []
+  );
+
   const syncSelectedParcels = useCallback((parcels: ParcelFeatureRecord[]) => {
     dispatch({ type: "SYNC_SELECTED_PARCELS", parcels });
   }, []);
@@ -377,7 +433,8 @@ export function ZoneSelectionProvider({ children }: { children: ReactNode }) {
       const parcelRecords = state.draft.selectedParcelIds
         .map((parcelId) => state.draft.parcelsById[parcelId])
         .filter((record): record is ParcelFeatureRecord => Boolean(record));
-      const hasDraftContent = parcelRecords.length > 0 || state.draft.drawnGeometries.length > 0;
+      const hasDraftContent =
+        parcelRecords.length > 0 || state.draft.drawnGeometries.length > 0 || state.draft.importedGeometries.length > 0;
 
       if (!hasDraftContent) {
         dispatch({
@@ -389,7 +446,8 @@ export function ZoneSelectionProvider({ children }: { children: ReactNode }) {
 
       const finalizedZone = createFinalizedDraftZone({
         parcelRecords,
-        drawnGeometries: state.draft.drawnGeometries
+        drawnGeometries: state.draft.drawnGeometries,
+        importedGeometries: state.draft.importedGeometries
       });
 
       if (!finalizedZone) {
@@ -412,6 +470,7 @@ export function ZoneSelectionProvider({ children }: { children: ReactNode }) {
       state,
       activateTool,
       toggleParcelSelection,
+      addImportedGeometries,
       syncSelectedParcels,
       addDrawVertex,
       completeDrawBoundary,
@@ -423,6 +482,7 @@ export function ZoneSelectionProvider({ children }: { children: ReactNode }) {
     }),
     [
       activateTool,
+      addImportedGeometries,
       addDrawVertex,
       cancelSelection,
       completeDrawBoundary,

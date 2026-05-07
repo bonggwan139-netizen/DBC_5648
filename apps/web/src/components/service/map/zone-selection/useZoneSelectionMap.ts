@@ -9,7 +9,8 @@ import {
   createConfirmedZoneFeatureCollection,
   createDraftUnionGeometryFeatureCollection,
   createDrawDraftGuideFeatureCollectionWithPreview,
-  createDrawDraftVertexFeatureCollection
+  createDrawDraftVertexFeatureCollection,
+  getZoneGeometriesBbox
 } from "./zoneSelectionGeometry";
 import { useZoneSelection } from "./zoneSelectionState";
 import { extractCadastralVertices, resolveDrawCoordinate } from "./zoneSelectionSnapping";
@@ -249,9 +250,10 @@ export function useZoneSelectionMap(params: {
     () =>
       createDraftUnionGeometryFeatureCollection({
         parcelRecords: selectedParcelRecords,
-        drawnGeometries: state.draft.drawnGeometries
+        drawnGeometries: state.draft.drawnGeometries,
+        importedGeometries: state.draft.importedGeometries
       }),
-    [selectedParcelRecords, state.draft.drawnGeometries]
+    [selectedParcelRecords, state.draft.drawnGeometries, state.draft.importedGeometries]
   );
 
   const drawGuideGeometryCollection = useMemo(
@@ -279,6 +281,16 @@ export function useZoneSelectionMap(params: {
     () => createConfirmedZoneFeatureCollection(state.confirmedZone),
     [state.confirmedZone]
   );
+
+  const latestImportedGeometryBounds = useMemo(() => {
+    const latestImport = state.draft.importedGeometries[state.draft.importedGeometries.length - 1];
+    if (!latestImport) {
+      return null;
+    }
+
+    const importBbox = getZoneGeometriesBbox(latestImport.geometries);
+    return importBbox ? { id: latestImport.id, bbox: importBbox } : null;
+  }, [state.draft.importedGeometries]);
 
   const isEditingWithParcelTool = state.status === "editing" && state.activeTool === "parcel";
   const isEditingWithDrawTool = state.status === "editing" && state.activeTool === "draw";
@@ -373,11 +385,13 @@ export function useZoneSelectionMap(params: {
     handleMapClick,
     handleMapMouseMove,
     handleMapContextMenu,
+    latestImportedGeometryBounds,
     isInteractionLocked,
     isDrawModeActive: isEditingWithDrawTool,
     hasZoneSelectionDraft:
       state.draft.selectedParcelIds.length > 0 ||
       state.draft.drawnGeometries.length > 0 ||
+      state.draft.importedGeometries.length > 0 ||
       state.draft.drawVertices.length > 0 ||
       state.confirmedZone !== null
   };

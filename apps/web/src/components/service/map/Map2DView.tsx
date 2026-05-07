@@ -399,6 +399,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     handleMapClick,
     handleMapMouseMove,
     handleMapContextMenu,
+    latestImportedGeometryBounds,
     isDrawModeActive,
     isInteractionLocked
   } = useZoneSelectionMap({
@@ -417,6 +418,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const handleMapMouseMoveEventRef = useRef<(event: unknown) => void>(() => {});
   const handleMapContextMenuEventRef = useRef<(event: unknown) => void>(() => {});
   const drawModeRef = useRef(false);
+  const lastFittedImportIdRef = useRef<string | null>(null);
 
   const resetPendingRequest = () => {
     pendingFetchRef.current?.abort();
@@ -833,6 +835,42 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
     setGeoJsonSourceData(mapRef.current, ZONE_CONFIRMED_SOURCE_ID, confirmedZoneCollection);
   }, [confirmedZoneCollection, isMapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!isMapReady || !map || !latestImportedGeometryBounds) {
+      return;
+    }
+
+    if (lastFittedImportIdRef.current === latestImportedGeometryBounds.id) {
+      return;
+    }
+
+    const [west, south, east, north] = latestImportedGeometryBounds.bbox;
+    if (
+      !Number.isFinite(west) ||
+      !Number.isFinite(south) ||
+      !Number.isFinite(east) ||
+      !Number.isFinite(north) ||
+      west >= east ||
+      south >= north
+    ) {
+      return;
+    }
+
+    lastFittedImportIdRef.current = latestImportedGeometryBounds.id;
+    map.fitBounds(
+      [
+        [west, south],
+        [east, north]
+      ],
+      {
+        padding: 80,
+        duration: 700,
+        maxZoom: 18
+      }
+    );
+  }, [isMapReady, latestImportedGeometryBounds]);
 
   useEffect(() => {
     const map = mapRef.current;

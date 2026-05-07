@@ -2,6 +2,10 @@ export type MapLibreMap = {
   addControl: (control: unknown, position?: string) => void;
   addLayer: (layer: Record<string, unknown>, beforeId?: string) => void;
   addSource: (id: string, source: Record<string, unknown>) => void;
+  fitBounds: (
+    bounds: [[number, number], [number, number]],
+    options?: { padding?: number; duration?: number; maxZoom?: number }
+  ) => void;
   flyTo: (options: { center: [number, number]; zoom?: number; essential?: boolean; duration?: number }) => void;
   getBounds: () => {
     getWest: () => number;

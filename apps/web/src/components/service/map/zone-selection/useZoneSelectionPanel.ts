@@ -1,6 +1,7 @@
 "use client";
 
 import { useZoneSelection } from "./zoneSelectionState";
+import type { ImportedGeometryMetadata, ZoneGeometry } from "./zoneSelectionTypes";
 
 function getModeBadgeLabel(status: ReturnType<typeof useZoneSelection>["state"]["status"]) {
   switch (status) {
@@ -14,10 +15,15 @@ function getModeBadgeLabel(status: ReturnType<typeof useZoneSelection>["state"][
 }
 
 export function useZoneSelectionPanel() {
-  const { state, activateTool, undoSelection, cancelSelection, confirmSelection } = useZoneSelection();
+  const { state, activateTool, addImportedGeometries, undoSelection, cancelSelection, confirmSelection, setFeedback } =
+    useZoneSelection();
 
   const selectedParcelCount = state.draft.selectedParcelIds.length;
   const drawnGeometryCount = state.draft.drawnGeometries.length;
+  const importedGeometryCount = state.draft.importedGeometries.reduce(
+    (count, record) => count + record.metadata.featureCount,
+    0
+  );
   const drawVertexCount = state.draft.drawVertices.length;
 
   let detailLabel = "";
@@ -25,11 +31,12 @@ export function useZoneSelectionPanel() {
     const activeToolLabel = state.activeTool === "draw" ? "그리기" : "필지";
     const parcelSummary = selectedParcelCount > 0 ? `필지 ${selectedParcelCount}개` : "필지 없음";
     const drawSummary = drawnGeometryCount > 0 ? `그린 경계 ${drawnGeometryCount}개` : "그린 경계 없음";
+    const importSummary = importedGeometryCount > 0 ? `SHP ${importedGeometryCount}개` : "SHP 없음";
 
     if (state.activeTool === "draw" && drawVertexCount > 0) {
-      detailLabel = `${activeToolLabel} 편집 중, ${parcelSummary}, ${drawSummary}, 현재 점 ${drawVertexCount}개`;
+      detailLabel = `${activeToolLabel} 편집 중, ${parcelSummary}, ${drawSummary}, ${importSummary}, 현재 점 ${drawVertexCount}개`;
     } else {
-      detailLabel = `${activeToolLabel} 편집 중, ${parcelSummary}, ${drawSummary}`;
+      detailLabel = `${activeToolLabel} 편집 중, ${parcelSummary}, ${drawSummary}, ${importSummary}`;
     }
   }
 
@@ -41,11 +48,12 @@ export function useZoneSelectionPanel() {
   const canConfirm =
     state.status === "editing" &&
     state.draft.drawVertices.length === 0 &&
-    (selectedParcelCount > 0 || drawnGeometryCount > 0);
+    (selectedParcelCount > 0 || drawnGeometryCount > 0 || importedGeometryCount > 0);
   const canCancel =
     state.status !== "idle" ||
     selectedParcelCount > 0 ||
     drawnGeometryCount > 0 ||
+    importedGeometryCount > 0 ||
     drawVertexCount > 0 ||
     state.confirmedZone !== null;
 
@@ -61,6 +69,9 @@ export function useZoneSelectionPanel() {
     canCancel,
     activateParcelMode: () => activateTool("parcel"),
     activateDrawMode: () => activateTool("draw"),
+    importShpGeometries: (params: { geometries: ZoneGeometry[]; metadata: ImportedGeometryMetadata }) =>
+      addImportedGeometries(params),
+    setFeedback,
     undoSelection,
     cancelSelection,
     confirmSelection

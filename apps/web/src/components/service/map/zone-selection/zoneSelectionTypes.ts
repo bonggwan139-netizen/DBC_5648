@@ -11,7 +11,7 @@ import type {
 
 export type ZoneSelectionStatus = "idle" | "editing" | "confirmed";
 export type ZoneSelectionTool = "parcel" | "draw";
-export type FinalizedZoneMode = ZoneSelectionTool | "mixed";
+export type FinalizedZoneMode = ZoneSelectionTool | "import" | "mixed";
 export type ZoneGeometry = Polygon | MultiPolygon;
 
 export type ParcelProps = Record<string, unknown>;
@@ -43,6 +43,18 @@ export type DrawGeometryRecord = {
   geometry: ZoneGeometry;
 };
 
+export type ImportedGeometryMetadata = {
+  fileName: string;
+  featureCount: number;
+  importedAt: string;
+};
+
+export type ImportedGeometryRecord = {
+  id: string;
+  geometries: ZoneGeometry[];
+  metadata: ImportedGeometryMetadata;
+};
+
 export type FinalizedZone = {
   id: string;
   mode: FinalizedZoneMode;
@@ -57,6 +69,7 @@ export type ZoneDraftSnapshot = {
   selectedParcelIds: string[];
   parcelsById: Record<string, ParcelFeatureRecord>;
   drawnGeometries: DrawGeometryRecord[];
+  importedGeometries: ImportedGeometryRecord[];
   drawVertices: DrawVertex[];
 };
 

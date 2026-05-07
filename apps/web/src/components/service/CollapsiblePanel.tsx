@@ -1,10 +1,11 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLandRegister } from "@/components/service/map/analysis/landRegisterState";
 import { useSiteAnalysis, type SiteAnalysisSection } from "@/components/service/map/analysis/siteAnalysisState";
 import { useMapSearch } from "@/components/service/map/search/mapSearchState";
+import { parseZoneShpZipFile } from "@/components/service/map/zone-selection/zoneSelectionShpImport";
 import { useZoneSelectionPanel } from "@/components/service/map/zone-selection/useZoneSelectionPanel";
 
 const siteAnalysisActions: Array<{ section: SiteAnalysisSection; label: string }> = [
@@ -76,9 +77,11 @@ function logReportCaptureWarning(message: string, error: unknown) {
 }
 
 export function CollapsiblePanel() {
+  const shpInputRef = useRef<HTMLInputElement | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isWordReportDownloading, setIsWordReportDownloading] = useState(false);
+  const [isShpImporting, setIsShpImporting] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportWarning, setReportWarning] = useState<string | null>(null);
   const { state: searchState, submitSearch } = useMapSearch();
@@ -91,6 +94,8 @@ export function CollapsiblePanel() {
     feedback,
     activateParcelMode,
     activateDrawMode,
+    importShpGeometries,
+    setFeedback: setZoneSelectionFeedback,
     undoSelection,
     cancelSelection,
     confirmSelection,
@@ -104,6 +109,35 @@ export function CollapsiblePanel() {
   const handleSubmitSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await submitSearch(searchQuery);
+  };
+
+  const handleOpenShpPicker = () => {
+    if (isShpImporting) {
+      return;
+    }
+
+    shpInputRef.current?.click();
+  };
+
+  const handleShpFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+
+    if (!file || isShpImporting) {
+      return;
+    }
+
+    setIsShpImporting(true);
+    setZoneSelectionFeedback(null);
+
+    try {
+      const result = await parseZoneShpZipFile(file);
+      importShpGeometries(result);
+    } catch (error) {
+      setZoneSelectionFeedback(error instanceof Error ? error.message : "SHP ZIP 파일을 가져올 수 없습니다.");
+    } finally {
+      setIsShpImporting(false);
+    }
   };
 
   const confirmedZone =
@@ -299,18 +333,35 @@ export function CollapsiblePanel() {
               </div>
 
               <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={activateParcelMode}
-                    className={`rounded-lg border px-3 py-1.5 text-[11px] font-medium transition ${
-                      isParcelActive
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    Parcel
-                  </button>
+                <div className="flex items-start gap-2">
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={activateParcelMode}
+                      className={`rounded-lg border px-3 py-1.5 text-[11px] font-medium transition ${
+                        isParcelActive
+                          ? "border-slate-900 bg-slate-900 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      Parcel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenShpPicker}
+                      disabled={isShpImporting}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isShpImporting ? "SHP..." : "SHP"}
+                    </button>
+                    <input
+                      ref={shpInputRef}
+                      type="file"
+                      accept=".zip"
+                      className="hidden"
+                      onChange={handleShpFileChange}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={activateDrawMode}
