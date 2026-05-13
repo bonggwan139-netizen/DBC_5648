@@ -70,8 +70,7 @@ const roadSideNoticeLines = [
 ];
 const planningSpecialPurposeAreaNoticeLines = [
   "※ 계 = 용도지역별 분석면적의 합",
-  "※ 면적오차 = 구역계 면적 - 계",
-  "※ 도형 수는 교차된 용도지역 원천도형 수입니다."
+  "※ 면적오차 = 구역계 면적 - 계"
 ];
 
 function formatArea(value: number) {
@@ -1064,6 +1063,11 @@ function PlanningSpecialPurposeAreaContent({
   return (
     <section className="min-h-0 flex-1 overflow-y-auto pt-5 font-[family-name:var(--font-pretendard)]">
       <h3 className="text-sm font-semibold text-slate-800">용도지역</h3>
+      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-light leading-5 text-amber-800">
+        {planningSpecialPurposeAreaNoticeLines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
 
       {status === "loading" ? (
         <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
@@ -1093,12 +1097,6 @@ function PlanningSpecialPurposeAreaContent({
               분석 결과에서 용도지역을 찾을 수 없습니다.
             </p>
           )}
-
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-light leading-5 text-amber-800">
-            {planningSpecialPurposeAreaNoticeLines.map((line) => (
-              <p key={line}>{line}</p>
-            ))}
-          </div>
         </div>
       ) : null}
     </section>

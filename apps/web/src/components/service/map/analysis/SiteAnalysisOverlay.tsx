@@ -44,16 +44,6 @@ const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
       { label: "건폐율현황", detailItem: "buildingCoverageRatio" },
       { label: "용적률현황", detailItem: "buildingFloorAreaRatio" }
     ]
-  },
-  {
-    title: "도시계획정보",
-    items: [
-      "기본계획(생활권)",
-      "관리계획(용도지역/지구/구역, 시설)",
-      "개발행위/지구단위계획구역",
-      "개발구역정보",
-      "공적규제정보"
-    ].map((label) => ({ label }))
   }
 ];
 
@@ -191,7 +181,7 @@ export function SiteAnalysisOverlay() {
         </button>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-3">
         {BASIC_INFO_COLUMNS.map((column) => (
           <div key={column.title} className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
             <h3 className="text-sm font-semibold text-slate-800">{column.title}</h3>
