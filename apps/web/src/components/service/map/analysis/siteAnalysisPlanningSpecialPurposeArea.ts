@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useZoneSelection } from "@/components/service/map/zone-selection/zoneSelectionState";
 import type { BasicInfoAnalysisRow } from "./siteAnalysisLandCategory";
 import type { SiteAnalysisMapFeatureCollection } from "./siteAnalysisMapFeatures";
-import { getPlanningSpecialPurposeAreaStyle } from "./planningSpecialPurposeAreaStyle";
+import {
+  getPlanningSpecialPurposeAreaDisplayOrder,
+  getPlanningSpecialPurposeAreaStyle
+} from "./planningSpecialPurposeAreaStyle";
 
 export type PlanningSpecialPurposeAreaResponse = {
   summary: {
@@ -47,10 +50,26 @@ function applyPlanningSpecialPurposeAreaRowStyle(row: BasicInfoAnalysisRow): Bas
 function applyPlanningSpecialPurposeAreaStyles(
   data: PlanningSpecialPurposeAreaResponse
 ): PlanningSpecialPurposeAreaResponse {
+  const tableRows = data.table_rows.map(applyPlanningSpecialPurposeAreaRowStyle);
+  const systemRows = tableRows.filter((row) => row.row_type !== "category");
+  const categoryRows = tableRows
+    .filter((row) => row.row_type === "category")
+    .sort((a, b) => {
+      const orderDiff =
+        getPlanningSpecialPurposeAreaDisplayOrder(a.label) - getPlanningSpecialPurposeAreaDisplayOrder(b.label);
+      return orderDiff !== 0 ? orderDiff : a.label.localeCompare(b.label, "ko-KR");
+    });
+
   return {
     ...data,
-    table_rows: data.table_rows.map(applyPlanningSpecialPurposeAreaRowStyle),
-    chart_rows: data.chart_rows.map(applyPlanningSpecialPurposeAreaRowStyle)
+    table_rows: [...systemRows, ...categoryRows],
+    chart_rows: data.chart_rows
+      .map(applyPlanningSpecialPurposeAreaRowStyle)
+      .sort((a, b) => {
+        const orderDiff =
+          getPlanningSpecialPurposeAreaDisplayOrder(a.label) - getPlanningSpecialPurposeAreaDisplayOrder(b.label);
+        return orderDiff !== 0 ? orderDiff : a.label.localeCompare(b.label, "ko-KR");
+      })
   };
 }
 

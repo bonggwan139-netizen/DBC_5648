@@ -57,6 +57,45 @@ export function normalizePlanningSpecialPurposeAreaName(name: unknown) {
     .replace(/\s+/g, "");
 }
 
+export const PLANNING_SPECIAL_PURPOSE_AREA_DISPLAY_ORDER = [
+  "제1종전용주거지역",
+  "제2종전용주거지역",
+  "제1종일반주거지역",
+  "제2종일반주거지역",
+  "제3종일반주거지역",
+  "준주거지역",
+  "중심상업지역",
+  "일반상업지역",
+  "근린상업지역",
+  "유통상업지역",
+  "전용공업지역",
+  "일반공업지역",
+  "준공업지역",
+  "보전녹지지역",
+  "자연녹지지역",
+  "도시지역",
+  "계획관리지역",
+  "생산관리지역",
+  "보전관리지역",
+  "관리지역",
+  "농림지역",
+  "생산녹지지역",
+  "자연환경보전지역",
+  "정보없음"
+] as const;
+
+const planningSpecialPurposeAreaDisplayOrderByName = new Map(
+  PLANNING_SPECIAL_PURPOSE_AREA_DISPLAY_ORDER.map((name, index) => [
+    normalizePlanningSpecialPurposeAreaName(name),
+    index
+  ])
+);
+
+export function getPlanningSpecialPurposeAreaDisplayOrder(name: unknown) {
+  const normalized = normalizePlanningSpecialPurposeAreaName(name);
+  return planningSpecialPurposeAreaDisplayOrderByName.get(normalized) ?? Number.MAX_SAFE_INTEGER;
+}
+
 const baseOutlineColor = "#6E6E6E";
 
 export const planningSpecialPurposeAreaStyleByName: Record<string, PlanningSpecialPurposeAreaStyle> = {
