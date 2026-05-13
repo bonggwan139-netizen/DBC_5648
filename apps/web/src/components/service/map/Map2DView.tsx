@@ -27,6 +27,12 @@ import {
 import { useMapSearch } from "./search/mapSearchState";
 import { SiteAnalysisDetailPanel } from "./analysis/SiteAnalysisDetailPanel";
 import { SiteAnalysisOverlay } from "./analysis/SiteAnalysisOverlay";
+import {
+  getPlanningSpecialPurposeAreaPatternImageId,
+  getPlanningSpecialPurposeAreaPatternLayerId,
+  PLANNING_SPECIAL_PURPOSE_AREA_PATTERNS,
+  type PlanningSpecialPurposeAreaPattern
+} from "./analysis/planningSpecialPurposeAreaStyle";
 import { createEmptySiteAnalysisMapFeatureCollection } from "./analysis/siteAnalysisMapFeatures";
 import { useSiteAnalysis } from "./analysis/siteAnalysisState";
 import { createEmptyFeatureCollection } from "./zone-selection/zoneSelectionGeometry";
@@ -81,6 +87,11 @@ const SITE_ANALYSIS_THEMATIC_SOURCE_ID = "site-analysis-thematic-map-features";
 const SITE_ANALYSIS_THEMATIC_FILL_LAYER_ID = "site-analysis-thematic-fill";
 const SITE_ANALYSIS_THEMATIC_POINT_LAYER_ID = "site-analysis-thematic-point";
 const SITE_ANALYSIS_THEMATIC_OUTLINE_LAYER_ID = "site-analysis-thematic-outline";
+const PLANNING_DATA_GROUP_SPECIAL_PURPOSE_AREA = "specialPurposeArea";
+const PLANNING_DATA_DEFAULT_SIZE = 1000;
+const PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID = "planning-vworld-special-purpose-area-source";
+const PLANNING_SPECIAL_PURPOSE_AREA_FILL_LAYER_ID = "planning-vworld-special-purpose-area-fill";
+const PLANNING_SPECIAL_PURPOSE_AREA_OUTLINE_LAYER_ID = "planning-vworld-special-purpose-area-outline";
 const ZONE_CONFIRMED_LINE_LAYER_ID = "zone-confirmed-line";
 
 class DataApiRequestError extends Error {
@@ -283,6 +294,36 @@ function setGeoJsonSourceData(map: MapLibreMap | null, sourceId: string, data: {
   source?.setData(data);
 }
 
+function createEmptyPlanningFeatureCollection() {
+  return {
+    type: "FeatureCollection" as const,
+    features: []
+  };
+}
+
+function toPlanningFeatureCollection(data: unknown) {
+  if (
+    data &&
+    typeof data === "object" &&
+    (data as { type?: string }).type === "FeatureCollection" &&
+    Array.isArray((data as { features?: unknown[] }).features)
+  ) {
+    return data as { type: "FeatureCollection"; features: unknown[] };
+  }
+
+  return createEmptyPlanningFeatureCollection();
+}
+
+function buildPlanningDataUrl(bbox: string) {
+  const params = new URLSearchParams({
+    group: PLANNING_DATA_GROUP_SPECIAL_PURPOSE_AREA,
+    bbox,
+    size: String(PLANNING_DATA_DEFAULT_SIZE)
+  });
+
+  return `/api/vworld/planning-data?${params.toString()}`;
+}
+
 function removeSiteAnalysisThematicMapLayers(map: MapLibreMap | null) {
   if (!map) {
     return;
@@ -367,14 +408,193 @@ function ensureSiteAnalysisThematicMapLayers(map: MapLibreMap) {
   }
 }
 
+function removePlanningSpecialPurposeAreaLayers(map: MapLibreMap | null) {
+  if (!map) {
+    return;
+  }
+
+  if (map.getLayer(PLANNING_SPECIAL_PURPOSE_AREA_OUTLINE_LAYER_ID)) {
+    map.removeLayer(PLANNING_SPECIAL_PURPOSE_AREA_OUTLINE_LAYER_ID);
+  }
+
+  PLANNING_SPECIAL_PURPOSE_AREA_PATTERNS.forEach((pattern) => {
+    const layerId = getPlanningSpecialPurposeAreaPatternLayerId(pattern);
+    if (map.getLayer(layerId)) {
+      map.removeLayer(layerId);
+    }
+  });
+
+  if (map.getLayer(PLANNING_SPECIAL_PURPOSE_AREA_FILL_LAYER_ID)) {
+    map.removeLayer(PLANNING_SPECIAL_PURPOSE_AREA_FILL_LAYER_ID);
+  }
+
+  if (map.getSource(PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID)) {
+    map.removeSource(PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID);
+  }
+}
+
+function getPlanningPatternColor(pattern: Exclude<PlanningSpecialPurposeAreaPattern, "none">) {
+  if (pattern.startsWith("red-")) {
+    return "#FF0000";
+  }
+
+  if (pattern.startsWith("green-")) {
+    return "#38A800";
+  }
+
+  if (pattern.startsWith("purple-")) {
+    return "#A900E6";
+  }
+
+  return "#000000";
+}
+
+function createPlanningPatternImage(pattern: Exclude<PlanningSpecialPurposeAreaPattern, "none">) {
+  const size = pattern.endsWith("-dot") ? 16 : 10;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Planning pattern canvas is unavailable.");
+  }
+
+  context.clearRect(0, 0, size, size);
+  context.strokeStyle = getPlanningPatternColor(pattern);
+  context.fillStyle = "transparent";
+  context.lineCap = "square";
+
+  if (pattern.endsWith("-horizontal")) {
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(0, size / 2);
+    context.lineTo(size, size / 2);
+    context.stroke();
+  } else if (pattern.endsWith("-diagonal")) {
+    context.lineWidth = 0.5;
+    [-size, 0, size].forEach((offset) => {
+      context.beginPath();
+      context.moveTo(offset, size);
+      context.lineTo(offset + size, 0);
+      context.stroke();
+    });
+  } else if (pattern.endsWith("-dot")) {
+    const radius = 3;
+    context.lineWidth = 0.5;
+    [
+      [size / 2, size / 2],
+      [0, 0],
+      [size, 0],
+      [0, size],
+      [size, size]
+    ].forEach(([x, y]) => {
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.stroke();
+    });
+  }
+
+  return context.getImageData(0, 0, size, size);
+}
+
+function ensurePlanningSpecialPurposeAreaPatternImages(map: MapLibreMap) {
+  PLANNING_SPECIAL_PURPOSE_AREA_PATTERNS.forEach((pattern) => {
+    const imageId = getPlanningSpecialPurposeAreaPatternImageId(pattern);
+    if (map.hasImage?.(imageId)) {
+      return;
+    }
+
+    try {
+      map.addImage(imageId, createPlanningPatternImage(pattern), { pixelRatio: 1 });
+    } catch {
+      // The image may already be registered on older MapLibre builds without hasImage typing.
+    }
+  });
+}
+
+function ensurePlanningSpecialPurposeAreaLayers(map: MapLibreMap) {
+  if (!map.getSource(PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID)) {
+    map.addSource(PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID, {
+      type: "geojson",
+      data: createEmptyPlanningFeatureCollection()
+    });
+  }
+
+  ensurePlanningSpecialPurposeAreaPatternImages(map);
+  const beforeLayerId = map.getLayer(ZONE_CONFIRMED_LINE_LAYER_ID) ? ZONE_CONFIRMED_LINE_LAYER_ID : undefined;
+
+  if (!map.getLayer(PLANNING_SPECIAL_PURPOSE_AREA_FILL_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: PLANNING_SPECIAL_PURPOSE_AREA_FILL_LAYER_ID,
+        type: "fill",
+        source: PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID,
+        filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+        paint: {
+          "fill-color": ["get", "__planningFillColor"],
+          "fill-opacity": 0.32
+        }
+      },
+      beforeLayerId
+    );
+  }
+
+  PLANNING_SPECIAL_PURPOSE_AREA_PATTERNS.forEach((pattern) => {
+    const layerId = getPlanningSpecialPurposeAreaPatternLayerId(pattern);
+    if (map.getLayer(layerId)) {
+      return;
+    }
+
+    map.addLayer(
+      {
+        id: layerId,
+        type: "fill",
+        source: PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID,
+        filter: [
+          "all",
+          ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+          ["==", ["get", "__planningPattern"], pattern]
+        ],
+        paint: {
+          "fill-pattern": getPlanningSpecialPurposeAreaPatternImageId(pattern),
+          "fill-opacity": 0.8
+        }
+      },
+      beforeLayerId
+    );
+  });
+
+  if (!map.getLayer(PLANNING_SPECIAL_PURPOSE_AREA_OUTLINE_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: PLANNING_SPECIAL_PURPOSE_AREA_OUTLINE_LAYER_ID,
+        type: "line",
+        source: PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID,
+        filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+        paint: {
+          "line-color": ["get", "__planningOutlineColor"],
+          "line-opacity": 0.65,
+          "line-width": 1
+        }
+      },
+      beforeLayerId
+    );
+  }
+}
+
 export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pendingFetchRef = useRef<AbortController | null>(null);
+  const pendingPlanningFetchRef = useRef<AbortController | null>(null);
   const pendingParcelAreaFetchRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
+  const planningDebounceTimerRef = useRef<number | null>(null);
   const lastBoundsKeyRef = useRef<string>("");
+  const lastPlanningBoundsKeyRef = useRef<string>("");
   const activeRequestIdRef = useRef(0);
+  const activePlanningRequestIdRef = useRef(0);
   const activeParcelAreaRequestIdRef = useRef(0);
 
   const [styleType, setStyleType] = useState<Base2DStyle>("road");
@@ -385,11 +605,20 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const [isSelectedParcelAreaLoading, setIsSelectedParcelAreaLoading] = useState(false);
   const [dataApiError, setDataApiError] = useState<string | null>(null);
   const [dataApiNotice, setDataApiNotice] = useState<string | null>(null);
+  const [planningData, setPlanningData] = useState<{ type: "FeatureCollection"; features: unknown[] }>(
+    createEmptyPlanningFeatureCollection
+  );
+  const [, setPlanningDataError] = useState<string | null>(null);
   const [, setLastFetchMeta] = useState<CadastralFetchMeta | null>(null);
 
   const selectedInfoParcelId = selectedParcel ? pickParcelSelectionKey(selectedParcel) : null;
   const { state: mapSearchState, consumePendingNavigation } = useMapSearch();
-  const { activeDetailItem, activeThematicMapFeatures, canOpen: canOpenSiteAnalysis } = useSiteAnalysis();
+  const {
+    activeDetailItem,
+    activePlanningMapLayer,
+    activeThematicMapFeatures,
+    canOpen: canOpenSiteAnalysis
+  } = useSiteAnalysis();
 
   const {
     decoratedVisibleFeatures,
@@ -414,6 +643,8 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
   const refreshCadastralDataRef = useRef<(force?: boolean) => Promise<void>>(async () => {});
   const scheduleRefreshCadastralDataRef = useRef<() => void>(() => {});
+  const refreshPlanningDataRef = useRef<(force?: boolean) => Promise<void>>(async () => {});
+  const scheduleRefreshPlanningDataRef = useRef<() => void>(() => {});
   const handleMapClickEventRef = useRef<(event: unknown) => void>(() => {});
   const handleMapMouseMoveEventRef = useRef<(event: unknown) => void>(() => {});
   const handleMapContextMenuEventRef = useRef<(event: unknown) => void>(() => {});
@@ -427,6 +658,16 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     if (debounceTimerRef.current !== null) {
       window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
+    }
+  };
+
+  const resetPendingPlanningRequest = () => {
+    pendingPlanningFetchRef.current?.abort();
+    pendingPlanningFetchRef.current = null;
+
+    if (planningDebounceTimerRef.current !== null) {
+      window.clearTimeout(planningDebounceTimerRef.current);
+      planningDebounceTimerRef.current = null;
     }
   };
 
@@ -550,6 +791,76 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     }
   };
 
+  const refreshPlanningData = async (force = false) => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+
+    if (activePlanningMapLayer !== PLANNING_DATA_GROUP_SPECIAL_PURPOSE_AREA) {
+      resetPendingPlanningRequest();
+      lastPlanningBoundsKeyRef.current = "";
+      setPlanningData(createEmptyPlanningFeatureCollection());
+      setPlanningDataError(null);
+      return;
+    }
+
+    const requestInfo = buildBoundsRequestInfo(map);
+    if (requestInfo.blockedReason !== null || !requestInfo.bbox) {
+      resetPendingPlanningRequest();
+      lastPlanningBoundsKeyRef.current = requestInfo.key;
+      setPlanningData(createEmptyPlanningFeatureCollection());
+      setPlanningDataError(null);
+      return;
+    }
+
+    if (!force && requestInfo.key === lastPlanningBoundsKeyRef.current) {
+      return;
+    }
+
+    lastPlanningBoundsKeyRef.current = requestInfo.key;
+    pendingPlanningFetchRef.current?.abort();
+    const controller = new AbortController();
+    pendingPlanningFetchRef.current = controller;
+    const requestId = activePlanningRequestIdRef.current + 1;
+    activePlanningRequestIdRef.current = requestId;
+
+    try {
+      const response = await fetch(buildPlanningDataUrl(requestInfo.bbox), {
+        method: "GET",
+        signal: controller.signal,
+        cache: "no-store"
+      });
+
+      const payload = (await response.json().catch(() => null)) as unknown;
+
+      if (!response.ok) {
+        const errorPayload = payload as { message?: string } | null;
+        throw new Error(errorPayload?.message ?? `Planning data request failed: ${response.status}`);
+      }
+
+      if (controller.signal.aborted || activePlanningRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setPlanningData(toPlanningFeatureCollection(payload));
+      setPlanningDataError(null);
+    } catch (error) {
+      if (controller.signal.aborted || activePlanningRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setPlanningData(createEmptyPlanningFeatureCollection());
+      setPlanningDataError(error instanceof Error ? error.message : "Planning data request failed.");
+    } finally {
+      if (controller.signal.aborted || activePlanningRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      pendingPlanningFetchRef.current = null;
+    }
+  };
+
   const scheduleRefreshCadastralData = () => {
     if (debounceTimerRef.current !== null) {
       window.clearTimeout(debounceTimerRef.current);
@@ -557,6 +868,16 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
     debounceTimerRef.current = window.setTimeout(() => {
       void refreshCadastralDataRef.current(false);
+    }, MAP_DATA_MOVEEND_DEBOUNCE_MS);
+  };
+
+  const scheduleRefreshPlanningData = () => {
+    if (planningDebounceTimerRef.current !== null) {
+      window.clearTimeout(planningDebounceTimerRef.current);
+    }
+
+    planningDebounceTimerRef.current = window.setTimeout(() => {
+      void refreshPlanningDataRef.current(false);
     }, MAP_DATA_MOVEEND_DEBOUNCE_MS);
   };
 
@@ -652,10 +973,18 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   useEffect(() => {
     refreshCadastralDataRef.current = refreshCadastralData;
     scheduleRefreshCadastralDataRef.current = scheduleRefreshCadastralData;
+    refreshPlanningDataRef.current = refreshPlanningData;
+    scheduleRefreshPlanningDataRef.current = scheduleRefreshPlanningData;
     handleMapClickEventRef.current = handleMapClickEvent;
     handleMapMouseMoveEventRef.current = handleMapMouseMoveEvent;
     handleMapContextMenuEventRef.current = handleMapContextMenuEvent;
-  }, [handleMapClickEvent, handleMapContextMenuEvent, handleMapMouseMoveEvent, refreshCadastralData]);
+  }, [
+    handleMapClickEvent,
+    handleMapContextMenuEvent,
+    handleMapMouseMoveEvent,
+    refreshCadastralData,
+    refreshPlanningData
+  ]);
 
   useEffect(() => {
     drawModeRef.current = isDrawModeActive;
@@ -720,6 +1049,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
 
         map.on("moveend", () => {
           scheduleRefreshCadastralDataRef.current();
+          scheduleRefreshPlanningDataRef.current();
         });
 
         map.on("click", (event: unknown) => {
@@ -747,7 +1077,12 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         window.clearTimeout(debounceTimerRef.current);
       }
 
+      if (planningDebounceTimerRef.current !== null) {
+        window.clearTimeout(planningDebounceTimerRef.current);
+      }
+
       pendingFetchRef.current?.abort();
+      pendingPlanningFetchRef.current?.abort();
       pendingParcelAreaFetchRef.current?.abort();
       mapRef.current?.remove();
       mapRef.current = null;
@@ -871,6 +1206,41 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       }
     );
   }, [isMapReady, latestImportedGeometryBounds]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!isMapReady || !map) {
+      return;
+    }
+
+    if (activePlanningMapLayer !== PLANNING_DATA_GROUP_SPECIAL_PURPOSE_AREA) {
+      resetPendingPlanningRequest();
+      lastPlanningBoundsKeyRef.current = "";
+      setPlanningData(createEmptyPlanningFeatureCollection());
+      setPlanningDataError(null);
+      removePlanningSpecialPurposeAreaLayers(map);
+      return;
+    }
+
+    void refreshPlanningDataRef.current(true);
+  }, [activePlanningMapLayer, isMapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!isMapReady || !map || activePlanningMapLayer !== PLANNING_DATA_GROUP_SPECIAL_PURPOSE_AREA) {
+      removePlanningSpecialPurposeAreaLayers(map);
+      return;
+    }
+
+    ensurePlanningSpecialPurposeAreaLayers(map);
+    setGeoJsonSourceData(map, PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID, planningData);
+
+    return () => {
+      removePlanningSpecialPurposeAreaLayers(map);
+    };
+  }, [activePlanningMapLayer, isMapReady, planningData]);
 
   useEffect(() => {
     const map = mapRef.current;

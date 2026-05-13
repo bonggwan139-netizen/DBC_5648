@@ -14,7 +14,7 @@ type BasicInfoColumn = {
 
 type LocationAnalysisColumn = {
   title: string;
-  items: string[];
+  items: BasicInfoItem[];
 };
 
 const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
@@ -75,7 +75,7 @@ const LOCATION_ANALYSIS_COLUMNS: LocationAnalysisColumn[] = [
       "수리/수문",
       "기상기후",
       "백두대간/정맥"
-    ]
+    ].map((label) => ({ label }))
   },
   {
     title: "토지건물분석",
@@ -90,24 +90,28 @@ const LOCATION_ANALYSIS_COLUMNS: LocationAnalysisColumn[] = [
       "지하층(정비사업)",
       "역세권분석",
       "주변건물현황"
-    ]
+    ].map((label) => ({ label }))
   },
   {
     title: "도시계획분석",
     items: [
-      "도시기본계획",
-      "도시관리계획",
-      "개발행위허가분석",
-      "지구단위계획구역 분석",
-      "개발구역분석",
-      "공적규제분석",
-      "문화재분석"
+      { label: "용도지역", detailItem: "planningSpecialPurposeArea" },
+      { label: "용도지구" },
+      { label: "용도구역" },
+      { label: "도시계획시설" }
     ]
   }
 ];
 
 export function SiteAnalysisOverlay() {
-  const { activeDetailItem, activeSection, canOpen, closeSection, openDetailItem } = useSiteAnalysis();
+  const {
+    activeDetailItem,
+    activeSection,
+    canOpen,
+    closeSection,
+    openDetailItem,
+    setActivePlanningMapLayer
+  } = useSiteAnalysis();
 
   if (!canOpen || !activeSection) {
     return null;
@@ -135,13 +139,34 @@ export function SiteAnalysisOverlay() {
             <div key={column.title} className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
               <h3 className="text-sm font-semibold text-slate-800">{column.title}</h3>
               <ul className="mt-2 space-y-1.5 text-[12px] leading-5 text-slate-600">
-                {column.items.map((item) => (
-                  <li key={item}>
-                    <span className="inline-flex rounded-md px-1 py-0.5 font-medium text-slate-700 transition hover:bg-white">
-                      {item}
-                    </span>
-                  </li>
-                ))}
+                {column.items.map((item) => {
+                  const detailItem = item.detailItem;
+
+                  return (
+                    <li key={item.label}>
+                      {detailItem ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openDetailItem(detailItem, "locationAnalysis");
+                            setActivePlanningMapLayer("specialPurposeArea");
+                          }}
+                          className={`rounded-md px-1 py-0.5 text-left font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${
+                            activeDetailItem === detailItem
+                              ? "bg-slate-900 text-white"
+                              : "text-slate-700 hover:bg-white"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ) : (
+                        <span className="inline-flex rounded-md px-1 py-0.5 font-medium text-slate-500">
+                          {item.label}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

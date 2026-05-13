@@ -20,17 +20,21 @@ export type SiteAnalysisDetailItem =
   | "buildingAge"
   | "buildingGrossFloorArea"
   | "buildingCoverageRatio"
-  | "buildingFloorAreaRatio";
+  | "buildingFloorAreaRatio"
+  | "planningSpecialPurposeArea";
+export type PlanningMapLayer = "specialPurposeArea";
 
 type SiteAnalysisContextValue = {
   activeSection: SiteAnalysisTopSection | null;
   activeDetailItem: SiteAnalysisDetailItem | null;
   canOpen: boolean;
+  activePlanningMapLayer: PlanningMapLayer | null;
   openSection: (section: SiteAnalysisTopSection) => void;
   closeSection: () => void;
-  openDetailItem: (item: SiteAnalysisDetailItem) => void;
+  openDetailItem: (item: SiteAnalysisDetailItem, section?: SiteAnalysisTopSection) => void;
   activeThematicMapFeatures: SiteAnalysisMapFeatureCollection | null;
   setActiveThematicMapFeatures: (features: SiteAnalysisMapFeatureCollection | null) => void;
+  setActivePlanningMapLayer: (layer: PlanningMapLayer | null) => void;
 };
 
 const SiteAnalysisContext = createContext<SiteAnalysisContextValue | null>(null);
@@ -40,6 +44,7 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
   const [activeSection, setActiveSection] = useState<SiteAnalysisTopSection | null>(null);
   const [activeDetailItem, setActiveDetailItem] = useState<SiteAnalysisDetailItem | null>(null);
   const [activeThematicMapFeatures, setActiveThematicMapFeatures] = useState<SiteAnalysisMapFeatureCollection | null>(null);
+  const [activePlanningMapLayer, setActivePlanningMapLayer] = useState<PlanningMapLayer | null>(null);
 
   const canOpen = zoneState.status === "confirmed" && zoneState.confirmedZone !== null;
 
@@ -50,6 +55,9 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
       }
 
       setActiveSection(section);
+      if (section !== "locationAnalysis") {
+        setActivePlanningMapLayer(null);
+      }
     },
     [canOpen]
   );
@@ -59,13 +67,16 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openDetailItem = useCallback(
-    (item: SiteAnalysisDetailItem) => {
+    (item: SiteAnalysisDetailItem, section: SiteAnalysisTopSection = "basic") => {
       if (!canOpen) {
         return;
       }
 
-      setActiveSection("basic");
+      setActiveSection(section);
       setActiveDetailItem(item);
+      if (item !== "planningSpecialPurposeArea") {
+        setActivePlanningMapLayer(null);
+      }
     },
     [canOpen]
   );
@@ -78,20 +89,32 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
     setActiveSection(null);
     setActiveDetailItem(null);
     setActiveThematicMapFeatures(null);
+    setActivePlanningMapLayer(null);
   }, [canOpen]);
 
   const value = useMemo<SiteAnalysisContextValue>(
     () => ({
       activeSection,
       activeDetailItem,
+      activePlanningMapLayer,
       canOpen,
       openSection,
       closeSection,
       openDetailItem,
       activeThematicMapFeatures,
-      setActiveThematicMapFeatures
+      setActiveThematicMapFeatures,
+      setActivePlanningMapLayer
     }),
-    [activeDetailItem, activeSection, activeThematicMapFeatures, canOpen, closeSection, openDetailItem, openSection]
+    [
+      activeDetailItem,
+      activePlanningMapLayer,
+      activeSection,
+      activeThematicMapFeatures,
+      canOpen,
+      closeSection,
+      openDetailItem,
+      openSection
+    ]
   );
 
   return <SiteAnalysisContext.Provider value={value}>{children}</SiteAnalysisContext.Provider>;

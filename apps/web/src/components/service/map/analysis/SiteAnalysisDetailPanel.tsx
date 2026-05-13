@@ -25,6 +25,15 @@ import {
 import { buildSiteAnalysisLocationRows } from "./siteAnalysisLocation";
 import { useSiteAnalysisOfficialPrice } from "./siteAnalysisOfficialPrice";
 import { useSiteAnalysisOwnership } from "./siteAnalysisOwnership";
+import {
+  type PlanningSpecialPurposeAreaResponse,
+  useSiteAnalysisPlanningSpecialPurposeArea
+} from "./siteAnalysisPlanningSpecialPurposeArea";
+import {
+  getPlanningSpecialPurposeAreaStyle,
+  type PlanningSpecialPurposeAreaPattern,
+  type PlanningSpecialPurposeAreaStyle
+} from "./planningSpecialPurposeAreaStyle";
 import { useSiteAnalysisRoadSide } from "./siteAnalysisRoadSide";
 import { useSiteAnalysis } from "./siteAnalysisState";
 import { useSiteAnalysisTerrainShape } from "./siteAnalysisTerrainShape";
@@ -59,9 +68,18 @@ const roadSideNoticeLines = [
   ...areaBasisNoticeLines,
   "※ 비접도는 세로한면(불), 세로각지(불), 맹지로 분류된 토지를 의미합니다."
 ];
+const planningSpecialPurposeAreaNoticeLines = [
+  "※ 계 = 용도지역별 분석면적의 합",
+  "※ 면적오차 = 구역계 면적 - 계",
+  "※ 도형 수는 교차된 용도지역 원천도형 수입니다."
+];
 
 function formatArea(value: number) {
   return `${areaFormatter.format(value)}㎡`;
+}
+
+function formatOptionalArea(value: number | null | undefined) {
+  return value === null || value === undefined ? "-" : formatArea(value);
 }
 
 function formatRatio(value: number | null) {
@@ -191,6 +209,13 @@ export function SiteAnalysisDetailPanel() {
     loadBuildingFloorAreaRatio,
     status: buildingFloorAreaRatioStatus
   } = useSiteAnalysisBuildingFloorAreaRatio();
+  const {
+    canRequest: canRequestPlanningSpecialPurposeArea,
+    data: planningSpecialPurposeAreaData,
+    error: planningSpecialPurposeAreaError,
+    loadPlanningSpecialPurposeArea,
+    status: planningSpecialPurposeAreaStatus
+  } = useSiteAnalysisPlanningSpecialPurposeArea();
   const [collapsed, setCollapsed] = useState(false);
   const locationRows = buildSiteAnalysisLocationRows(data);
 
@@ -310,6 +335,21 @@ export function SiteAnalysisDetailPanel() {
     loadBuildingFloorAreaRatio
   ]);
 
+  useEffect(() => {
+    if (
+      canRequestPlanningSpecialPurposeArea &&
+      activeDetailItem === "planningSpecialPurposeArea" &&
+      planningSpecialPurposeAreaStatus === "idle"
+    ) {
+      void loadPlanningSpecialPurposeArea();
+    }
+  }, [
+    activeDetailItem,
+    canRequestPlanningSpecialPurposeArea,
+    loadPlanningSpecialPurposeArea,
+    planningSpecialPurposeAreaStatus
+  ]);
+
   const activeThematicMapFeatures =
     activeDetailItem === "basicLandCategory"
       ? landCategoryData?.map_features ?? null
@@ -363,7 +403,9 @@ export function SiteAnalysisDetailPanel() {
           activeDetailItem === "buildingCoverageRatio" ||
           activeDetailItem === "buildingFloorAreaRatio"
         ? "건축물정보"
-        : "토지정보";
+        : activeDetailItem === "planningSpecialPurposeArea"
+          ? "도시계획분석"
+          : "토지정보";
 
   return (
     <motion.aside
@@ -500,6 +542,12 @@ export function SiteAnalysisDetailPanel() {
               fallbackTitle="용적률현황"
               loadingMessage="용적률현황을 불러오는 중입니다."
               status={buildingFloorAreaRatioStatus}
+            />
+          ) : activeDetailItem === "planningSpecialPurposeArea" ? (
+            <PlanningSpecialPurposeAreaContent
+              data={planningSpecialPurposeAreaData}
+              error={planningSpecialPurposeAreaError}
+              status={planningSpecialPurposeAreaStatus}
             />
           ) : activeDetailItem === "basicOwnership" ? (
             <CategoryAnalysisContent
@@ -927,6 +975,181 @@ function BuildingInfoLayerItemRow({ item }: { item: BuildingInfoLayerItem }) {
       </span>
       <span className="shrink-0 text-slate-500">{countFormatter.format(item.count)}동</span>
     </li>
+  );
+}
+
+function getPlanningPatternColor(pattern: PlanningSpecialPurposeAreaPattern) {
+  if (pattern.startsWith("red-")) {
+    return "#FF0000";
+  }
+
+  if (pattern.startsWith("green-")) {
+    return "#38A800";
+  }
+
+  if (pattern.startsWith("purple-")) {
+    return "#A900E6";
+  }
+
+  return "#000000";
+}
+
+function PlanningSpecialPurposeAreaLegendSymbol({ label }: { label: string }) {
+  const style = getPlanningSpecialPurposeAreaStyle(label);
+  const patternColor = getPlanningPatternColor(style.pattern);
+
+  return (
+    <svg viewBox="0 0 28 18" className="block h-[18px] w-7 shrink-0" role="img" aria-label={`${label} 범례`}>
+      <rect x="0.5" y="0.5" width="27" height="17" fill={style.fillColor} stroke={style.outlineColor} strokeWidth="1" />
+      <PlanningSpecialPurposeAreaLegendPattern pattern={style.pattern} color={patternColor} />
+    </svg>
+  );
+}
+
+function PlanningSpecialPurposeAreaLegendPattern({
+  color,
+  pattern
+}: {
+  color: string;
+  pattern: PlanningSpecialPurposeAreaStyle["pattern"];
+}) {
+  if (pattern === "none") {
+    return null;
+  }
+
+  if (pattern.endsWith("-diagonal")) {
+    return (
+      <g stroke={color} strokeLinecap="square" strokeWidth="0.8">
+        {[-18, -8, 2, 12, 22].map((x) => (
+          <line key={x} x1={x} y1="18" x2={x + 18} y2="0" />
+        ))}
+      </g>
+    );
+  }
+
+  if (pattern.endsWith("-horizontal")) {
+    return (
+      <g stroke={color} strokeLinecap="square" strokeWidth="0.8">
+        {[5, 13].map((y) => (
+          <line key={y} x1="0" y1={y} x2="28" y2={y} />
+        ))}
+      </g>
+    );
+  }
+
+  if (pattern.endsWith("-dot")) {
+    return (
+      <g fill="none" stroke={color} strokeWidth="0.8">
+        {[5, 13].flatMap((y) =>
+          [6, 14, 22].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="2.6" />)
+        )}
+      </g>
+    );
+  }
+
+  return null;
+}
+
+function PlanningSpecialPurposeAreaContent({
+  data,
+  error,
+  status
+}: {
+  data: PlanningSpecialPurposeAreaResponse | null;
+  error: string | null;
+  status: "idle" | "loading" | "success" | "error";
+}) {
+  const categoryRows = data?.table_rows.filter((row) => row.row_type === "category") ?? [];
+
+  return (
+    <section className="min-h-0 flex-1 overflow-y-auto pt-5 font-[family-name:var(--font-pretendard)]">
+      <h3 className="text-sm font-semibold text-slate-800">용도지역</h3>
+
+      {status === "loading" ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
+          용도지역을 불러오는 중입니다.
+        </p>
+      ) : null}
+
+      {status === "error" ? (
+        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-[12px] text-rose-700">
+          {error ?? "용도지역을 불러오지 못했습니다."}
+        </p>
+      ) : null}
+
+      {status === "success" && data ? (
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-2">
+            <PlanningSummaryCard label="구역계 면적" value={formatOptionalArea(data.summary.zone_area_m2)} />
+            <PlanningSummaryCard label="분석면적" value={formatOptionalArea(data.summary.category_total_area_m2)} />
+            <PlanningSummaryCard label="면적오차" value={formatOptionalArea(data.summary.summary_area_error_m2)} />
+            <PlanningSummaryCard label="용도지역 수" value={formatNullableNumber(data.summary.category_count)} />
+          </div>
+
+          {categoryRows.length > 0 ? (
+            <PlanningSpecialPurposeAreaTable rows={categoryRows} />
+          ) : (
+            <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
+              분석 결과에서 용도지역을 찾을 수 없습니다.
+            </p>
+          )}
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-light leading-5 text-amber-800">
+            {planningSpecialPurposeAreaNoticeLines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function PlanningSummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <p className="text-[11px] font-medium text-slate-500">{label}</p>
+      <p className="mt-1 text-[13px] font-semibold text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function PlanningSpecialPurposeAreaTable({ rows }: { rows: BasicInfoAnalysisRow[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[620px] divide-y divide-slate-200 text-left text-[11px] font-[family-name:var(--font-pretendard)]">
+          <thead className="sticky top-0 bg-slate-50 text-slate-500">
+            <tr>
+              <th className="px-3 py-2 font-semibold">범례</th>
+              <th className="px-3 py-2 font-semibold">용도지역</th>
+              <th className="px-3 py-2 font-semibold">구분</th>
+              <th className="px-3 py-2 font-semibold">면적</th>
+              <th className="px-3 py-2 font-semibold">비율</th>
+              <th className="px-3 py-2 font-semibold">도형 수</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <td className="px-3 py-2">
+                  <PlanningSpecialPurposeAreaLegendSymbol label={row.label} />
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800">{row.label}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-600">{row.note ?? "-"}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{formatArea(row.area_m2)}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">
+                  {formatRatio(row.ratio_percent)}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">
+                  {formatParcelCount(row.parcel_count)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

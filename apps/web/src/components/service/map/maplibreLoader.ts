@@ -19,6 +19,8 @@ export type MapLibreMap = {
       }
     | undefined;
   getLayer: (id: string) => unknown | undefined;
+  addImage: (id: string, image: ImageData, options?: Record<string, unknown>) => void;
+  hasImage?: (id: string) => boolean;
   on: (...args: unknown[]) => void;
   project: (lngLat: { lng: number; lat: number } | [number, number]) => {
     x: number;
