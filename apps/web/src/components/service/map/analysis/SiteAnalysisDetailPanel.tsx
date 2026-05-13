@@ -1059,7 +1059,7 @@ function PlanningSpecialPurposeAreaContent({
   error: string | null;
   status: "idle" | "loading" | "success" | "error";
 }) {
-  const categoryRows = data?.table_rows.filter((row) => row.row_type === "category") ?? [];
+  const tableRows = data?.table_rows ?? [];
 
   return (
     <section className="min-h-0 flex-1 overflow-y-auto pt-5 font-[family-name:var(--font-pretendard)]">
@@ -1086,8 +1086,8 @@ function PlanningSpecialPurposeAreaContent({
             <PlanningSummaryCard label="용도지역 수" value={formatNullableNumber(data.summary.category_count)} />
           </div>
 
-          {categoryRows.length > 0 ? (
-            <PlanningSpecialPurposeAreaTable rows={categoryRows} />
+          {tableRows.length > 0 ? (
+            <PlanningSpecialPurposeAreaTable rows={tableRows} />
           ) : (
             <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
               분석 결과에서 용도지역을 찾을 수 없습니다.
@@ -1105,6 +1105,20 @@ function PlanningSpecialPurposeAreaContent({
   );
 }
 
+function getPlanningSpecialPurposeAreaCellClass(row: BasicInfoAnalysisRow, className = "") {
+  const weightClass = row.row_type === "zone" || row.row_type === "total" ? "font-semibold" : "font-medium";
+  const colorClass =
+    row.row_type === "error" ? "text-slate-500" : row.row_type === "category" ? "text-slate-700" : "text-slate-900";
+  const borderClass =
+    row.row_type === "total"
+      ? "border-b-2 border-slate-300"
+      : row.row_type === "zone" || row.row_type === "error"
+        ? "border-b border-slate-200"
+        : "";
+
+  return `${className} ${weightClass} ${colorClass} ${borderClass}`.trim();
+}
+
 function PlanningSummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
@@ -1118,30 +1132,36 @@ function PlanningSpecialPurposeAreaTable({ rows }: { rows: BasicInfoAnalysisRow[
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[620px] divide-y divide-slate-200 text-left text-[11px] font-[family-name:var(--font-pretendard)]">
+        <table className="w-full min-w-[620px] divide-y divide-slate-200 text-left text-[12px] font-[family-name:var(--font-pretendard)]">
           <thead className="sticky top-0 bg-slate-50 text-slate-500">
             <tr>
               <th className="px-3 py-2 font-semibold">범례</th>
               <th className="px-3 py-2 font-semibold">용도지역</th>
               <th className="px-3 py-2 font-semibold">구분</th>
-              <th className="px-3 py-2 font-semibold">면적</th>
-              <th className="px-3 py-2 font-semibold">비율</th>
-              <th className="px-3 py-2 font-semibold">도형 수</th>
+              <th className="px-3 py-2 text-right font-semibold">면적</th>
+              <th className="px-3 py-2 text-right font-semibold">비율</th>
+              <th className="px-3 py-2 text-right font-semibold">도형 수</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
             {rows.map((row) => (
               <tr key={row.key}>
-                <td className="px-3 py-2">
-                  <PlanningSpecialPurposeAreaLegendSymbol label={row.label} />
+                <td className={getPlanningSpecialPurposeAreaCellClass(row, "px-3 py-2")}>
+                  {row.row_type === "category" ? <PlanningSpecialPurposeAreaLegendSymbol label={row.label} /> : "-"}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800">{row.label}</td>
-                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-600">{row.note ?? "-"}</td>
-                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{formatArea(row.area_m2)}</td>
-                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">
+                <td className={getPlanningSpecialPurposeAreaCellClass(row, "whitespace-nowrap px-3 py-2")}>
+                  {row.label}
+                </td>
+                <td className={getPlanningSpecialPurposeAreaCellClass(row, "whitespace-nowrap px-3 py-2")}>
+                  {row.note ?? "-"}
+                </td>
+                <td className={getPlanningSpecialPurposeAreaCellClass(row, "whitespace-nowrap px-3 py-2 text-right")}>
+                  {formatArea(row.area_m2)}
+                </td>
+                <td className={getPlanningSpecialPurposeAreaCellClass(row, "whitespace-nowrap px-3 py-2 text-right")}>
                   {formatRatio(row.ratio_percent)}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">
+                <td className={getPlanningSpecialPurposeAreaCellClass(row, "whitespace-nowrap px-3 py-2 text-right")}>
                   {formatParcelCount(row.parcel_count)}
                 </td>
               </tr>
