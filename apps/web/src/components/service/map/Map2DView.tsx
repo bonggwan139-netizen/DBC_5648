@@ -625,7 +625,7 @@ function addNaturalEnvironmentMapLayers(map: MapLibreMap, overlay: NonNullable<N
       type: "raster",
       source: NATURAL_ENVIRONMENT_RASTER_SOURCE_ID,
       paint: {
-        "raster-opacity": 0.65
+        "raster-opacity": 1
       }
     },
     beforeLayerId
