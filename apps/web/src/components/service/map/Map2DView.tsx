@@ -34,7 +34,7 @@ import {
   type PlanningSpecialPurposeAreaPattern
 } from "./analysis/planningSpecialPurposeAreaStyle";
 import { createEmptySiteAnalysisMapFeatureCollection } from "./analysis/siteAnalysisMapFeatures";
-import { useSiteAnalysis } from "./analysis/siteAnalysisState";
+import { useSiteAnalysis, type NaturalEnvironmentMapOverlay } from "./analysis/siteAnalysisState";
 import { createEmptyFeatureCollection } from "./zone-selection/zoneSelectionGeometry";
 import { useZoneSelectionMap } from "./zone-selection/useZoneSelectionMap";
 import type { CadastralFeatureCollection, ParcelProps, ZoneGeometry } from "./zone-selection/zoneSelectionTypes";
@@ -92,6 +92,10 @@ const PLANNING_DATA_DEFAULT_SIZE = 1000;
 const PLANNING_SPECIAL_PURPOSE_AREA_SOURCE_ID = "planning-vworld-special-purpose-area-source";
 const PLANNING_SPECIAL_PURPOSE_AREA_FILL_LAYER_ID = "planning-vworld-special-purpose-area-fill";
 const PLANNING_SPECIAL_PURPOSE_AREA_OUTLINE_LAYER_ID = "planning-vworld-special-purpose-area-outline";
+const NATURAL_ENVIRONMENT_RASTER_SOURCE_ID = "natural-environment-raster-source";
+const NATURAL_ENVIRONMENT_RASTER_LAYER_ID = "natural-environment-raster-layer";
+const NATURAL_ENVIRONMENT_CONTOUR_SOURCE_ID = "natural-environment-contour-source";
+const NATURAL_ENVIRONMENT_CONTOUR_LINE_LAYER_ID = "natural-environment-contour-line";
 const ZONE_CONFIRMED_LINE_LAYER_ID = "zone-confirmed-line";
 
 class DataApiRequestError extends Error {
@@ -583,6 +587,70 @@ function ensurePlanningSpecialPurposeAreaLayers(map: MapLibreMap) {
   }
 }
 
+function removeNaturalEnvironmentMapLayers(map: MapLibreMap | null) {
+  if (!map) {
+    return;
+  }
+
+  if (map.getLayer(NATURAL_ENVIRONMENT_CONTOUR_LINE_LAYER_ID)) {
+    map.removeLayer(NATURAL_ENVIRONMENT_CONTOUR_LINE_LAYER_ID);
+  }
+
+  if (map.getLayer(NATURAL_ENVIRONMENT_RASTER_LAYER_ID)) {
+    map.removeLayer(NATURAL_ENVIRONMENT_RASTER_LAYER_ID);
+  }
+
+  if (map.getSource(NATURAL_ENVIRONMENT_CONTOUR_SOURCE_ID)) {
+    map.removeSource(NATURAL_ENVIRONMENT_CONTOUR_SOURCE_ID);
+  }
+
+  if (map.getSource(NATURAL_ENVIRONMENT_RASTER_SOURCE_ID)) {
+    map.removeSource(NATURAL_ENVIRONMENT_RASTER_SOURCE_ID);
+  }
+}
+
+function addNaturalEnvironmentMapLayers(map: MapLibreMap, overlay: NonNullable<NaturalEnvironmentMapOverlay>) {
+  removeNaturalEnvironmentMapLayers(map);
+  const beforeLayerId = map.getLayer(ZONE_CONFIRMED_LINE_LAYER_ID) ? ZONE_CONFIRMED_LINE_LAYER_ID : undefined;
+
+  map.addSource(NATURAL_ENVIRONMENT_RASTER_SOURCE_ID, {
+    type: "image",
+    url: overlay.raster.data_url,
+    coordinates: overlay.raster.coordinates_4326
+  });
+
+  map.addLayer(
+    {
+      id: NATURAL_ENVIRONMENT_RASTER_LAYER_ID,
+      type: "raster",
+      source: NATURAL_ENVIRONMENT_RASTER_SOURCE_ID,
+      paint: {
+        "raster-opacity": 0.65
+      }
+    },
+    beforeLayerId
+  );
+
+  map.addSource(NATURAL_ENVIRONMENT_CONTOUR_SOURCE_ID, {
+    type: "geojson",
+    data: overlay.contours
+  });
+
+  map.addLayer(
+    {
+      id: NATURAL_ENVIRONMENT_CONTOUR_LINE_LAYER_ID,
+      type: "line",
+      source: NATURAL_ENVIRONMENT_CONTOUR_SOURCE_ID,
+      paint: {
+        "line-color": "#475569",
+        "line-opacity": 0.7,
+        "line-width": 0.8
+      }
+    },
+    beforeLayerId
+  );
+}
+
 export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -615,6 +683,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const { state: mapSearchState, consumePendingNavigation } = useMapSearch();
   const {
     activeDetailItem,
+    activeNaturalEnvironmentMapOverlay,
     activePlanningMapLayer,
     activeThematicMapFeatures,
     canOpen: canOpenSiteAnalysis
@@ -1241,6 +1310,21 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       removePlanningSpecialPurposeAreaLayers(map);
     };
   }, [activePlanningMapLayer, isMapReady, planningData]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!isMapReady || !map || !activeNaturalEnvironmentMapOverlay) {
+      removeNaturalEnvironmentMapLayers(map);
+      return;
+    }
+
+    addNaturalEnvironmentMapLayers(map, activeNaturalEnvironmentMapOverlay);
+
+    return () => {
+      removeNaturalEnvironmentMapLayers(map);
+    };
+  }, [activeNaturalEnvironmentMapOverlay, isMapReady]);
 
   useEffect(() => {
     const map = mapRef.current;

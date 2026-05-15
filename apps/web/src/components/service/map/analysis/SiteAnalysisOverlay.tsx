@@ -51,21 +51,23 @@ const LOCATION_ANALYSIS_COLUMNS: LocationAnalysisColumn[] = [
   {
     title: "자연환경분석",
     items: [
-      "표고분석",
-      "경사분석",
-      "향분석",
-      "단면분석",
-      "생태연도",
-      "식생(임상별)",
-      "식생(영급별)",
-      "식생(수종별)",
-      "식생(경급별)",
-      "국토환경",
-      "산사태위험지도",
-      "수리/수문",
-      "기상기후",
-      "백두대간/정맥"
-    ].map((label) => ({ label }))
+      { label: "표고분석", detailItem: "naturalEnvironmentElevation" },
+      { label: "경사분석", detailItem: "naturalEnvironmentSlope" },
+      ...[
+        "향분석",
+        "단면분석",
+        "생태연도",
+        "식생(임상별)",
+        "식생(영급별)",
+        "식생(수종별)",
+        "식생(경급별)",
+        "국토환경",
+        "산사태위험지도",
+        "수리/수문",
+        "기상기후",
+        "백두대간/정맥"
+      ].map((label) => ({ label }))
+    ]
   },
   {
     title: "토지건물분석",
@@ -139,7 +141,9 @@ export function SiteAnalysisOverlay() {
                           type="button"
                           onClick={() => {
                             openDetailItem(detailItem, "locationAnalysis");
-                            setActivePlanningMapLayer("specialPurposeArea");
+                            setActivePlanningMapLayer(
+                              detailItem === "planningSpecialPurposeArea" ? "specialPurposeArea" : null
+                            );
                           }}
                           className={`rounded-md px-1 py-0.5 text-left font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${
                             activeDetailItem === detailItem

@@ -21,18 +21,43 @@ export type SiteAnalysisDetailItem =
   | "buildingGrossFloorArea"
   | "buildingCoverageRatio"
   | "buildingFloorAreaRatio"
+  | "naturalEnvironmentElevation"
+  | "naturalEnvironmentSlope"
   | "planningSpecialPurposeArea";
 export type PlanningMapLayer = "specialPurposeArea";
+
+export type NaturalEnvironmentMapOverlay = {
+  kind: "elevation" | "slope";
+  raster: {
+    type: "image";
+    data_url: string;
+    bbox_5186?: [number, number, number, number];
+    bbox_4326?: [number, number, number, number];
+    coordinates_4326: [[number, number], [number, number], [number, number], [number, number]];
+    srid: number;
+    pixel_size_m?: number;
+  };
+  contours: {
+    type: "FeatureCollection";
+    features: Array<{
+      type: "Feature";
+      geometry: unknown;
+      properties?: Record<string, unknown>;
+    }>;
+  };
+} | null;
 
 type SiteAnalysisContextValue = {
   activeSection: SiteAnalysisTopSection | null;
   activeDetailItem: SiteAnalysisDetailItem | null;
   canOpen: boolean;
+  activeNaturalEnvironmentMapOverlay: NaturalEnvironmentMapOverlay;
   activePlanningMapLayer: PlanningMapLayer | null;
   openSection: (section: SiteAnalysisTopSection) => void;
   closeSection: () => void;
   openDetailItem: (item: SiteAnalysisDetailItem, section?: SiteAnalysisTopSection) => void;
   activeThematicMapFeatures: SiteAnalysisMapFeatureCollection | null;
+  setActiveNaturalEnvironmentMapOverlay: (overlay: NaturalEnvironmentMapOverlay) => void;
   setActiveThematicMapFeatures: (features: SiteAnalysisMapFeatureCollection | null) => void;
   setActivePlanningMapLayer: (layer: PlanningMapLayer | null) => void;
 };
@@ -45,6 +70,8 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
   const [activeDetailItem, setActiveDetailItem] = useState<SiteAnalysisDetailItem | null>(null);
   const [activeThematicMapFeatures, setActiveThematicMapFeatures] = useState<SiteAnalysisMapFeatureCollection | null>(null);
   const [activePlanningMapLayer, setActivePlanningMapLayer] = useState<PlanningMapLayer | null>(null);
+  const [activeNaturalEnvironmentMapOverlay, setActiveNaturalEnvironmentMapOverlay] =
+    useState<NaturalEnvironmentMapOverlay>(null);
 
   const canOpen = zoneState.status === "confirmed" && zoneState.confirmedZone !== null;
 
@@ -57,6 +84,7 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
       setActiveSection(section);
       if (section !== "locationAnalysis") {
         setActivePlanningMapLayer(null);
+        setActiveNaturalEnvironmentMapOverlay(null);
       }
     },
     [canOpen]
@@ -77,6 +105,9 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
       if (item !== "planningSpecialPurposeArea") {
         setActivePlanningMapLayer(null);
       }
+      if (item !== "naturalEnvironmentElevation" && item !== "naturalEnvironmentSlope") {
+        setActiveNaturalEnvironmentMapOverlay(null);
+      }
     },
     [canOpen]
   );
@@ -90,23 +121,27 @@ export function SiteAnalysisProvider({ children }: { children: ReactNode }) {
     setActiveDetailItem(null);
     setActiveThematicMapFeatures(null);
     setActivePlanningMapLayer(null);
+    setActiveNaturalEnvironmentMapOverlay(null);
   }, [canOpen]);
 
   const value = useMemo<SiteAnalysisContextValue>(
     () => ({
       activeSection,
       activeDetailItem,
+      activeNaturalEnvironmentMapOverlay,
       activePlanningMapLayer,
       canOpen,
       openSection,
       closeSection,
       openDetailItem,
       activeThematicMapFeatures,
+      setActiveNaturalEnvironmentMapOverlay,
       setActiveThematicMapFeatures,
       setActivePlanningMapLayer
     }),
     [
       activeDetailItem,
+      activeNaturalEnvironmentMapOverlay,
       activePlanningMapLayer,
       activeSection,
       activeThematicMapFeatures,

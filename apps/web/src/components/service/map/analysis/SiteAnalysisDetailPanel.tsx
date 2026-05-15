@@ -18,6 +18,8 @@ import {
   useSiteAnalysisBuildingUse
 } from "./siteAnalysisBuildingInfo";
 import { useSiteAnalysisAreaSummary } from "./siteAnalysisAreaSummary";
+import { useSiteAnalysisNaturalEnvironmentElevation } from "./siteAnalysisNaturalEnvironmentElevation";
+import { useSiteAnalysisNaturalEnvironmentSlope } from "./siteAnalysisNaturalEnvironmentSlope";
 import {
   type BasicInfoAnalysisRow,
   useSiteAnalysisLandCategory
@@ -68,6 +70,14 @@ const roadSideNoticeLines = [
   ...areaBasisNoticeLines,
   "※ 비접도는 세로한면(불), 세로각지(불), 맹지로 분류된 토지를 의미합니다."
 ];
+const naturalEnvironmentElevationNoticeLines = [
+  "※ 표고 구간은 5m 단위로 자동 산정됩니다.",
+  "※ 면적은 구역계와 표고 구간 폴리곤의 교차면적으로 산정됩니다."
+];
+const naturalEnvironmentSlopeNoticeLines = [
+  "※ 경사 구간은 도 단위 기준입니다.",
+  "※ 면적은 구역계와 경사 구간 폴리곤의 교차면적으로 산정됩니다."
+];
 const planningSpecialPurposeAreaNoticeLines = [
   "※ 계 = 용도지역별 분석면적의 합",
   "※ 면적오차 = 구역계 면적 - 계"
@@ -115,7 +125,12 @@ function getLandCategoryCellClass(row: BasicInfoAnalysisRow, className = "") {
 }
 
 export function SiteAnalysisDetailPanel() {
-  const { activeDetailItem, canOpen, setActiveThematicMapFeatures } = useSiteAnalysis();
+  const {
+    activeDetailItem,
+    canOpen,
+    setActiveNaturalEnvironmentMapOverlay,
+    setActiveThematicMapFeatures
+  } = useSiteAnalysis();
   const { canRequest, data, error, loadLandRegister, status } = useLandRegister();
   const {
     canRequest: canRequestLandCategory,
@@ -208,6 +223,20 @@ export function SiteAnalysisDetailPanel() {
     loadBuildingFloorAreaRatio,
     status: buildingFloorAreaRatioStatus
   } = useSiteAnalysisBuildingFloorAreaRatio();
+  const {
+    canRequest: canRequestNaturalEnvironmentElevation,
+    data: naturalEnvironmentElevationData,
+    error: naturalEnvironmentElevationError,
+    loadNaturalEnvironmentElevation,
+    status: naturalEnvironmentElevationStatus
+  } = useSiteAnalysisNaturalEnvironmentElevation();
+  const {
+    canRequest: canRequestNaturalEnvironmentSlope,
+    data: naturalEnvironmentSlopeData,
+    error: naturalEnvironmentSlopeError,
+    loadNaturalEnvironmentSlope,
+    status: naturalEnvironmentSlopeStatus
+  } = useSiteAnalysisNaturalEnvironmentSlope();
   const {
     canRequest: canRequestPlanningSpecialPurposeArea,
     data: planningSpecialPurposeAreaData,
@@ -336,6 +365,36 @@ export function SiteAnalysisDetailPanel() {
 
   useEffect(() => {
     if (
+      canRequestNaturalEnvironmentElevation &&
+      activeDetailItem === "naturalEnvironmentElevation" &&
+      naturalEnvironmentElevationStatus === "idle"
+    ) {
+      void loadNaturalEnvironmentElevation();
+    }
+  }, [
+    activeDetailItem,
+    canRequestNaturalEnvironmentElevation,
+    loadNaturalEnvironmentElevation,
+    naturalEnvironmentElevationStatus
+  ]);
+
+  useEffect(() => {
+    if (
+      canRequestNaturalEnvironmentSlope &&
+      activeDetailItem === "naturalEnvironmentSlope" &&
+      naturalEnvironmentSlopeStatus === "idle"
+    ) {
+      void loadNaturalEnvironmentSlope();
+    }
+  }, [
+    activeDetailItem,
+    canRequestNaturalEnvironmentSlope,
+    loadNaturalEnvironmentSlope,
+    naturalEnvironmentSlopeStatus
+  ]);
+
+  useEffect(() => {
+    if (
       canRequestPlanningSpecialPurposeArea &&
       activeDetailItem === "planningSpecialPurposeArea" &&
       planningSpecialPurposeAreaStatus === "idle"
@@ -387,6 +446,49 @@ export function SiteAnalysisDetailPanel() {
     setActiveThematicMapFeatures(activeThematicMapFeatures);
   }, [activeDetailItem, activeThematicMapFeatures, canOpen, setActiveThematicMapFeatures]);
 
+  useEffect(() => {
+    if (!canOpen) {
+      setActiveNaturalEnvironmentMapOverlay(null);
+      return;
+    }
+
+    if (
+      activeDetailItem === "naturalEnvironmentElevation" &&
+      naturalEnvironmentElevationStatus === "success" &&
+      naturalEnvironmentElevationData?.map_overlay
+    ) {
+      setActiveNaturalEnvironmentMapOverlay({
+        kind: "elevation",
+        raster: naturalEnvironmentElevationData.map_overlay.raster,
+        contours: naturalEnvironmentElevationData.map_overlay.contours
+      });
+      return;
+    }
+
+    if (
+      activeDetailItem === "naturalEnvironmentSlope" &&
+      naturalEnvironmentSlopeStatus === "success" &&
+      naturalEnvironmentSlopeData?.map_overlay
+    ) {
+      setActiveNaturalEnvironmentMapOverlay({
+        kind: "slope",
+        raster: naturalEnvironmentSlopeData.map_overlay.raster,
+        contours: naturalEnvironmentSlopeData.map_overlay.contours
+      });
+      return;
+    }
+
+    setActiveNaturalEnvironmentMapOverlay(null);
+  }, [
+    activeDetailItem,
+    canOpen,
+    naturalEnvironmentElevationData,
+    naturalEnvironmentElevationStatus,
+    naturalEnvironmentSlopeData,
+    naturalEnvironmentSlopeStatus,
+    setActiveNaturalEnvironmentMapOverlay
+  ]);
+
   if (!canOpen || !activeDetailItem) {
     return null;
   }
@@ -402,6 +504,8 @@ export function SiteAnalysisDetailPanel() {
           activeDetailItem === "buildingCoverageRatio" ||
           activeDetailItem === "buildingFloorAreaRatio"
         ? "건축물정보"
+        : activeDetailItem === "naturalEnvironmentElevation" || activeDetailItem === "naturalEnvironmentSlope"
+          ? "자연환경분석"
         : activeDetailItem === "planningSpecialPurposeArea"
           ? "도시계획분석"
           : "토지정보";
@@ -541,6 +645,26 @@ export function SiteAnalysisDetailPanel() {
               fallbackTitle="용적률현황"
               loadingMessage="용적률현황을 불러오는 중입니다."
               status={buildingFloorAreaRatioStatus}
+            />
+          ) : activeDetailItem === "naturalEnvironmentElevation" ? (
+            <CategoryAnalysisContent
+              data={naturalEnvironmentElevationData}
+              emptyMessage="분석 결과에서 표고분석을 찾을 수 없습니다."
+              error={naturalEnvironmentElevationError}
+              loadingMessage="표고분석을 불러오는 중입니다."
+              noticeLines={naturalEnvironmentElevationNoticeLines}
+              status={naturalEnvironmentElevationStatus}
+              title="표고분석"
+            />
+          ) : activeDetailItem === "naturalEnvironmentSlope" ? (
+            <CategoryAnalysisContent
+              data={naturalEnvironmentSlopeData}
+              emptyMessage="분석 결과에서 경사분석을 찾을 수 없습니다."
+              error={naturalEnvironmentSlopeError}
+              loadingMessage="경사분석을 불러오는 중입니다."
+              noticeLines={naturalEnvironmentSlopeNoticeLines}
+              status={naturalEnvironmentSlopeStatus}
+              title="경사분석"
             />
           ) : activeDetailItem === "planningSpecialPurposeArea" ? (
             <PlanningSpecialPurposeAreaContent
