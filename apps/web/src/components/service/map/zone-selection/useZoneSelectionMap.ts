@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { area as turfArea, booleanPointInPolygon, point as turfPoint } from "@turf/turf";
 import type { Position } from "geojson";
 import { CADASTRAL_HIT_LAYER_ID } from "../cadastralLayerStyle";
@@ -170,6 +170,58 @@ function resolveClickedParcelFeature(
   }, null);
 }
 
+function resolveParcelFeatureAtCoordinate(features: CadastralFeature[], coordinate: [number, number]) {
+  const candidatePoint = turfPoint(coordinate);
+  const containingCandidates = features
+    .map(normalizeCadastralFeature)
+    .filter((candidate) => {
+      try {
+        return booleanPointInPolygon(candidatePoint, candidate);
+      } catch {
+        return false;
+      }
+    });
+
+  const dedupedCandidates = Array.from(
+    containingCandidates.reduce((candidateMap, candidate) => {
+      const selectionKey = getParcelSelectionKey(candidate);
+      if (!selectionKey) {
+        const fallbackKey = `__candidate__${candidateMap.size}`;
+        candidateMap.set(fallbackKey, candidate);
+        return candidateMap;
+      }
+
+      const current = candidateMap.get(selectionKey);
+      if (!current) {
+        candidateMap.set(selectionKey, candidate);
+        return candidateMap;
+      }
+
+      try {
+        if (turfArea(candidate) < turfArea(current)) {
+          candidateMap.set(selectionKey, candidate);
+        }
+      } catch {
+        // Keep the first safe candidate if area comparison fails.
+      }
+
+      return candidateMap;
+    }, new Map<string, CadastralFeature>())
+  ).map(([, candidate]) => candidate);
+
+  return dedupedCandidates.reduce<CadastralFeature | null>((bestCandidate, candidate) => {
+    if (!bestCandidate) {
+      return candidate;
+    }
+
+    try {
+      return turfArea(candidate) < turfArea(bestCandidate) ? candidate : bestCandidate;
+    } catch {
+      return bestCandidate;
+    }
+  }, null);
+}
+
 export function useZoneSelectionMap(params: {
   map: MapLibreMap | null;
   visibleFeatures: CadastralFeatureCollection;
@@ -179,6 +231,7 @@ export function useZoneSelectionMap(params: {
   const {
     state,
     toggleParcelSelection,
+    addParcelSelection,
     syncSelectedParcels,
     addDrawVertex,
     completeDrawBoundary,
@@ -343,6 +396,28 @@ export function useZoneSelectionMap(params: {
     params.onSelectInfoParcel(pickedFeature.properties);
   };
 
+  const addParcelByCoordinate = useCallback(
+    (coordinate: [number, number]) => {
+      const pickedFeature = resolveParcelFeatureAtCoordinate(params.visibleFeatures.features, coordinate);
+      if (!pickedFeature) {
+        return "not-found" as const;
+      }
+
+      const parcelRecord = toParcelFeatureRecord(pickedFeature);
+      if (!parcelRecord) {
+        return "not-found" as const;
+      }
+
+      if (selectedParcelIds.has(parcelRecord.parcelId)) {
+        return "already-selected" as const;
+      }
+
+      addParcelSelection(parcelRecord);
+      return "added" as const;
+    },
+    [addParcelSelection, params.visibleFeatures.features, selectedParcelIds]
+  );
+
   const handleMapMouseMove = (event: MapClickEvent) => {
     if (!params.map || !isEditingWithDrawTool || state.draft.drawVertices.length === 0) {
       if (hoverCoordinate !== null) {
@@ -383,6 +458,7 @@ export function useZoneSelectionMap(params: {
     draftVertexCollection,
     confirmedZoneCollection,
     handleMapClick,
+    addParcelByCoordinate,
     handleMapMouseMove,
     handleMapContextMenu,
     latestImportedGeometryBounds,

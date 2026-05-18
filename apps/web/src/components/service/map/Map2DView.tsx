@@ -36,6 +36,8 @@ import {
 import { createEmptySiteAnalysisMapFeatureCollection } from "./analysis/siteAnalysisMapFeatures";
 import { useSiteAnalysis, type NaturalEnvironmentMapOverlay } from "./analysis/siteAnalysisState";
 import { createEmptyFeatureCollection } from "./zone-selection/zoneSelectionGeometry";
+import { ZoneSelectionSearchPanel } from "./zone-selection/ZoneSelectionSearchPanel";
+import { useZoneSelectionSearch } from "./zone-selection/zoneSelectionSearchState";
 import { useZoneSelectionMap } from "./zone-selection/useZoneSelectionMap";
 import type { CadastralFeatureCollection, ParcelProps, ZoneGeometry } from "./zone-selection/zoneSelectionTypes";
 
@@ -97,6 +99,8 @@ const NATURAL_ENVIRONMENT_RASTER_LAYER_ID = "natural-environment-raster-layer";
 const NATURAL_ENVIRONMENT_CONTOUR_SOURCE_ID = "natural-environment-contour-source";
 const NATURAL_ENVIRONMENT_CONTOUR_LINE_LAYER_ID = "natural-environment-contour-line";
 const ZONE_CONFIRMED_LINE_LAYER_ID = "zone-confirmed-line";
+const ZONE_SEARCH_SELECTION_TIMEOUT_MS = 7000;
+const ZONE_SEARCH_SELECTION_RETRY_MS = 400;
 
 class DataApiRequestError extends Error {
   status: number;
@@ -112,6 +116,17 @@ class DataApiRequestError extends Error {
 
 function createEmptyCadastralFeatureCollection(): CadastralFeatureCollection {
   return createEmptyFeatureCollection<ZoneGeometry, ParcelProps>();
+}
+
+function isCoordinateWithinMapBounds(map: MapLibreMap, coordinate: [number, number]) {
+  const [lng, lat] = coordinate;
+  const bounds = map.getBounds();
+  return (
+    lng >= bounds.getWest() &&
+    lng <= bounds.getEast() &&
+    lat >= bounds.getSouth() &&
+    lat <= bounds.getNorth()
+  );
 }
 
 function toFeatureCollection(data: unknown): CadastralFeatureCollection {
@@ -682,6 +697,12 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const selectedInfoParcelId = selectedParcel ? pickParcelSelectionKey(selectedParcel) : null;
   const { state: mapSearchState, consumePendingNavigation } = useMapSearch();
   const {
+    state: zoneSearchState,
+    consumePendingNavigation: consumeZoneSearchPendingNavigation,
+    completeCandidateSelection,
+    failCandidateSelection
+  } = useZoneSelectionSearch();
+  const {
     activeDetailItem,
     activeNaturalEnvironmentMapOverlay,
     activePlanningMapLayer,
@@ -695,6 +716,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     draftVertexCollection,
     confirmedZoneCollection,
     handleMapClick,
+    addParcelByCoordinate,
     handleMapMouseMove,
     handleMapContextMenu,
     latestImportedGeometryBounds,
@@ -719,6 +741,9 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const handleMapContextMenuEventRef = useRef<(event: unknown) => void>(() => {});
   const drawModeRef = useRef(false);
   const lastFittedImportIdRef = useRef<string | null>(null);
+  const zoneSearchSelectionDeadlineRef = useRef<number | null>(null);
+  const zoneSearchSelectionRetryTimerRef = useRef<number | null>(null);
+  const [zoneSearchSelectionRetryTick, setZoneSearchSelectionRetryTick] = useState(0);
 
   const resetPendingRequest = () => {
     pendingFetchRef.current?.abort();
@@ -1150,6 +1175,10 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         window.clearTimeout(planningDebounceTimerRef.current);
       }
 
+      if (zoneSearchSelectionRetryTimerRef.current !== null) {
+        window.clearTimeout(zoneSearchSelectionRetryTimerRef.current);
+      }
+
       pendingFetchRef.current?.abort();
       pendingPlanningFetchRef.current?.abort();
       pendingParcelAreaFetchRef.current?.abort();
@@ -1207,6 +1236,87 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     });
     consumePendingNavigation(pendingNavigation.id);
   }, [consumePendingNavigation, isMapReady, mapSearchState.pendingNavigation]);
+
+  useEffect(() => {
+    const pendingNavigation = zoneSearchState.pendingNavigation;
+    if (!isMapReady || !mapRef.current || !pendingNavigation) {
+      return;
+    }
+
+    if (zoneSearchState.pendingSelection?.id === pendingNavigation.id) {
+      zoneSearchSelectionDeadlineRef.current = Date.now() + ZONE_SEARCH_SELECTION_TIMEOUT_MS;
+      if (zoneSearchSelectionRetryTimerRef.current !== null) {
+        window.clearTimeout(zoneSearchSelectionRetryTimerRef.current);
+      }
+      zoneSearchSelectionRetryTimerRef.current = window.setTimeout(() => {
+        setZoneSearchSelectionRetryTick((tick) => tick + 1);
+      }, 1000);
+    }
+
+    mapRef.current.flyTo({
+      center: pendingNavigation.center,
+      zoom: pendingNavigation.zoom,
+      essential: true,
+      duration: 900
+    });
+    consumeZoneSearchPendingNavigation(pendingNavigation.id);
+  }, [
+    consumeZoneSearchPendingNavigation,
+    isMapReady,
+    zoneSearchState.pendingNavigation,
+    zoneSearchState.pendingSelection
+  ]);
+
+  useEffect(() => {
+    const pendingSelection = zoneSearchState.pendingSelection;
+    const map = mapRef.current;
+    if (!pendingSelection || !isMapReady || !map) {
+      if (zoneSearchSelectionRetryTimerRef.current !== null) {
+        window.clearTimeout(zoneSearchSelectionRetryTimerRef.current);
+        zoneSearchSelectionRetryTimerRef.current = null;
+      }
+      zoneSearchSelectionDeadlineRef.current = null;
+      return;
+    }
+
+    const result = addParcelByCoordinate(pendingSelection.candidate.center);
+    if (result === "added" || result === "already-selected") {
+      if (zoneSearchSelectionRetryTimerRef.current !== null) {
+        window.clearTimeout(zoneSearchSelectionRetryTimerRef.current);
+        zoneSearchSelectionRetryTimerRef.current = null;
+      }
+      zoneSearchSelectionDeadlineRef.current = null;
+      completeCandidateSelection(pendingSelection.id);
+      return;
+    }
+
+    const deadline =
+      zoneSearchSelectionDeadlineRef.current ??
+      pendingSelection.requestedAt + ZONE_SEARCH_SELECTION_TIMEOUT_MS;
+    const shouldFail =
+      Date.now() >= deadline && isCoordinateWithinMapBounds(map, pendingSelection.candidate.center);
+
+    if (shouldFail) {
+      zoneSearchSelectionDeadlineRef.current = null;
+      failCandidateSelection(pendingSelection.id, "해당 위치의 필지를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (zoneSearchSelectionRetryTimerRef.current !== null) {
+      window.clearTimeout(zoneSearchSelectionRetryTimerRef.current);
+    }
+
+    zoneSearchSelectionRetryTimerRef.current = window.setTimeout(() => {
+      setZoneSearchSelectionRetryTick((tick) => tick + 1);
+    }, ZONE_SEARCH_SELECTION_RETRY_MS);
+  }, [
+    addParcelByCoordinate,
+    completeCandidateSelection,
+    failCandidateSelection,
+    isMapReady,
+    zoneSearchSelectionRetryTick,
+    zoneSearchState.pendingSelection
+  ]);
 
   useEffect(() => {
     if (!isMapReady) {
@@ -1359,6 +1469,8 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   return (
     <div className="relative h-full w-full">
       <div ref={mapContainerRef} className="h-full w-full" />
+
+      <ZoneSelectionSearchPanel />
 
       {showStyleSelector ? (
         <div className="absolute left-6 top-[55px] z-10 flex flex-col gap-[5px]">

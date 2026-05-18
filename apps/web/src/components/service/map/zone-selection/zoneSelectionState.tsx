@@ -16,6 +16,7 @@ type ZoneSelectionContextValue = {
   state: ZoneSelectionState;
   activateTool: (tool: ZoneSelectionTool) => void;
   toggleParcelSelection: (parcel: ParcelFeatureRecord) => void;
+  addParcelSelection: (parcel: ParcelFeatureRecord) => void;
   addImportedGeometries: (params: { geometries: DrawGeometryRecord["geometry"][]; metadata: ImportedGeometryMetadata }) => void;
   syncSelectedParcels: (parcels: ParcelFeatureRecord[]) => void;
   addDrawVertex: (vertex: DrawVertex) => void;
@@ -30,6 +31,7 @@ type ZoneSelectionContextValue = {
 type ZoneSelectionAction =
   | { type: "ACTIVATE_TOOL"; tool: ZoneSelectionTool }
   | { type: "TOGGLE_PARCEL"; parcel: ParcelFeatureRecord }
+  | { type: "ADD_PARCEL"; parcel: ParcelFeatureRecord }
   | { type: "ADD_IMPORTED_GEOMETRIES"; geometries: DrawGeometryRecord["geometry"][]; metadata: ImportedGeometryMetadata }
   | { type: "SYNC_SELECTED_PARCELS"; parcels: ParcelFeatureRecord[] }
   | { type: "ADD_DRAW_VERTEX"; vertex: DrawVertex }
@@ -159,6 +161,45 @@ function reducer(state: ZoneSelectionState, action: ZoneSelectionAction): ZoneSe
             [action.parcel.parcelId]: action.parcel
           },
           history: [...state.draft.history, snapshot]
+        },
+        feedback: null
+      };
+    }
+
+    case "ADD_PARCEL": {
+      const baseState =
+        state.status === "confirmed"
+          ? {
+              ...createInitialState(),
+              status: "editing" as const,
+              activeTool: "parcel" as const
+            }
+          : {
+              ...state,
+              status: "editing" as const,
+              activeTool: state.activeTool ?? ("parcel" as const),
+              confirmedZone: null
+            };
+
+      if (baseState.draft.selectedParcelIds.includes(action.parcel.parcelId)) {
+        return {
+          ...baseState,
+          feedback: null
+        };
+      }
+
+      const snapshot = snapshotFromState(baseState);
+
+      return {
+        ...baseState,
+        draft: {
+          ...baseState.draft,
+          selectedParcelIds: [...baseState.draft.selectedParcelIds, action.parcel.parcelId],
+          parcelsById: {
+            ...baseState.draft.parcelsById,
+            [action.parcel.parcelId]: action.parcel
+          },
+          history: [...baseState.draft.history, snapshot]
         },
         feedback: null
       };
@@ -358,6 +399,10 @@ export function ZoneSelectionProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "TOGGLE_PARCEL", parcel });
   }, []);
 
+  const addParcelSelection = useCallback((parcel: ParcelFeatureRecord) => {
+    dispatch({ type: "ADD_PARCEL", parcel });
+  }, []);
+
   const addImportedGeometries = useCallback(
     (params: { geometries: DrawGeometryRecord["geometry"][]; metadata: ImportedGeometryMetadata }) => {
       dispatch({ type: "ADD_IMPORTED_GEOMETRIES", geometries: params.geometries, metadata: params.metadata });
@@ -470,6 +515,7 @@ export function ZoneSelectionProvider({ children }: { children: ReactNode }) {
       state,
       activateTool,
       toggleParcelSelection,
+      addParcelSelection,
       addImportedGeometries,
       syncSelectedParcels,
       addDrawVertex,
@@ -482,6 +528,7 @@ export function ZoneSelectionProvider({ children }: { children: ReactNode }) {
     }),
     [
       activateTool,
+      addParcelSelection,
       addImportedGeometries,
       addDrawVertex,
       cancelSelection,

@@ -3,6 +3,7 @@ import { MapView } from "@/components/service/MapView";
 import { LandRegisterProvider } from "@/components/service/map/analysis/landRegisterState";
 import { SiteAnalysisProvider } from "@/components/service/map/analysis/siteAnalysisState";
 import { MapSearchProvider } from "@/components/service/map/search/mapSearchState";
+import { ZoneSelectionSearchProvider } from "@/components/service/map/zone-selection/zoneSelectionSearchState";
 import { ZoneSelectionProvider } from "@/components/service/map/zone-selection/zoneSelectionState";
 
 export default function DbcMapServicePage() {
@@ -10,17 +11,19 @@ export default function DbcMapServicePage() {
     <section className="h-[calc(100vh-56px)] w-full">
       <MapSearchProvider>
         <ZoneSelectionProvider>
-          <SiteAnalysisProvider>
-            <LandRegisterProvider>
-              <div className="flex h-full w-full">
-                <CollapsiblePanel />
+          <ZoneSelectionSearchProvider>
+            <SiteAnalysisProvider>
+              <LandRegisterProvider>
+                <div className="flex h-full w-full">
+                  <CollapsiblePanel />
 
-                <div className="relative flex-1 overflow-hidden">
-                  <MapView />
+                  <div className="relative flex-1 overflow-hidden">
+                    <MapView />
+                  </div>
                 </div>
-              </div>
-            </LandRegisterProvider>
-          </SiteAnalysisProvider>
+              </LandRegisterProvider>
+            </SiteAnalysisProvider>
+          </ZoneSelectionSearchProvider>
         </ZoneSelectionProvider>
       </MapSearchProvider>
     </section>

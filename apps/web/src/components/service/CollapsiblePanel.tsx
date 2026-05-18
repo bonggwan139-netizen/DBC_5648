@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useLandRegister } from "@/components/service/map/analysis/landRegisterState";
 import { useSiteAnalysis, type SiteAnalysisSection } from "@/components/service/map/analysis/siteAnalysisState";
 import { useMapSearch } from "@/components/service/map/search/mapSearchState";
+import { useZoneSelectionSearch } from "@/components/service/map/zone-selection/zoneSelectionSearchState";
 import { parseZoneShpZipFile } from "@/components/service/map/zone-selection/zoneSelectionShpImport";
 import { useZoneSelectionPanel } from "@/components/service/map/zone-selection/useZoneSelectionPanel";
 
@@ -94,6 +95,7 @@ export function CollapsiblePanel() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportWarning, setReportWarning] = useState<string | null>(null);
   const { state: searchState, submitSearch } = useMapSearch();
+  const { openPanel: openZoneSearchPanel } = useZoneSelectionSearch();
   const { canRequest: canRequestLandRegister, openLandRegister } = useLandRegister();
   const { activeSection, canOpen: canOpenSiteAnalysis, openSection } = useSiteAnalysis();
   const {
@@ -325,7 +327,7 @@ export function CollapsiblePanel() {
               ) : null}
             </section>
 
-            <section className="rounded-2xl border border-stroke bg-white p-4">
+            <section data-zone-selection-card="true" className="rounded-2xl border border-stroke bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <p className="truncate text-sm font-semibold text-slate-700">구역 선택</p>
@@ -414,6 +416,13 @@ export function CollapsiblePanel() {
                     className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     SHP
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openZoneSearchPanel}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  >
+                    Search
                   </button>
                   <input
                     ref={shpInputRef}
