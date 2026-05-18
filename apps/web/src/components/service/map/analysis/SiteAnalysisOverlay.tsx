@@ -56,7 +56,7 @@ const LOCATION_ANALYSIS_COLUMNS: LocationAnalysisColumn[] = [
       ...[
         "향분석",
         "단면분석",
-        "생태연도",
+        "생태자연도",
         "식생(임상별)",
         "식생(영급별)",
         "식생(수종별)",
