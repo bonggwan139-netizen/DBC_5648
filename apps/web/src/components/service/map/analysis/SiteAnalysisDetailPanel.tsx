@@ -18,6 +18,10 @@ import {
   useSiteAnalysisBuildingUse
 } from "./siteAnalysisBuildingInfo";
 import { useSiteAnalysisAreaSummary } from "./siteAnalysisAreaSummary";
+import {
+  type NaturalEnvironmentEcologyNatureMapResponse,
+  useSiteAnalysisNaturalEnvironmentEcologyNatureMap
+} from "./siteAnalysisNaturalEnvironmentEcologyNatureMap";
 import { useSiteAnalysisNaturalEnvironmentElevation } from "./siteAnalysisNaturalEnvironmentElevation";
 import { useSiteAnalysisNaturalEnvironmentSlope } from "./siteAnalysisNaturalEnvironmentSlope";
 import {
@@ -77,6 +81,10 @@ const naturalEnvironmentElevationNoticeLines = [
 const naturalEnvironmentSlopeNoticeLines = [
   "※ 경사 구간은 도 단위 기준입니다.",
   "※ 면적은 구역계와 경사 구간 폴리곤의 교차면적으로 산정됩니다."
+];
+const naturalEnvironmentEcologyNatureMapNoticeLines = [
+  "※ 면적은 구역계와 생태자연도 등급 polygon의 교차면적으로 산정됩니다.",
+  "※ 생태자연도 미해당 지역은 등급별 합계에 포함되지 않을 수 있습니다."
 ];
 const planningSpecialPurposeAreaNoticeLines = [
   "※ 계 = 용도지역별 분석면적의 합",
@@ -230,6 +238,13 @@ export function SiteAnalysisDetailPanel() {
     loadNaturalEnvironmentElevation,
     status: naturalEnvironmentElevationStatus
   } = useSiteAnalysisNaturalEnvironmentElevation();
+  const {
+    canRequest: canRequestNaturalEnvironmentEcologyNatureMap,
+    data: naturalEnvironmentEcologyNatureMapData,
+    error: naturalEnvironmentEcologyNatureMapError,
+    loadNaturalEnvironmentEcologyNatureMap,
+    status: naturalEnvironmentEcologyNatureMapStatus
+  } = useSiteAnalysisNaturalEnvironmentEcologyNatureMap();
   const {
     canRequest: canRequestNaturalEnvironmentSlope,
     data: naturalEnvironmentSlopeData,
@@ -395,6 +410,21 @@ export function SiteAnalysisDetailPanel() {
 
   useEffect(() => {
     if (
+      canRequestNaturalEnvironmentEcologyNatureMap &&
+      activeDetailItem === "naturalEnvironmentEcologyNatureMap" &&
+      naturalEnvironmentEcologyNatureMapStatus === "idle"
+    ) {
+      void loadNaturalEnvironmentEcologyNatureMap();
+    }
+  }, [
+    activeDetailItem,
+    canRequestNaturalEnvironmentEcologyNatureMap,
+    loadNaturalEnvironmentEcologyNatureMap,
+    naturalEnvironmentEcologyNatureMapStatus
+  ]);
+
+  useEffect(() => {
+    if (
       canRequestPlanningSpecialPurposeArea &&
       activeDetailItem === "planningSpecialPurposeArea" &&
       planningSpecialPurposeAreaStatus === "idle"
@@ -435,7 +465,9 @@ export function SiteAnalysisDetailPanel() {
                             ? buildingCoverageRatioData?.map_features ?? null
                             : activeDetailItem === "buildingFloorAreaRatio"
                               ? buildingFloorAreaRatioData?.map_features ?? null
-                              : null;
+                              : activeDetailItem === "naturalEnvironmentEcologyNatureMap"
+                                ? naturalEnvironmentEcologyNatureMapData?.map_features ?? null
+                                : null;
 
   useEffect(() => {
     if (!canOpen || !activeDetailItem) {
@@ -504,7 +536,9 @@ export function SiteAnalysisDetailPanel() {
           activeDetailItem === "buildingCoverageRatio" ||
           activeDetailItem === "buildingFloorAreaRatio"
         ? "건축물정보"
-        : activeDetailItem === "naturalEnvironmentElevation" || activeDetailItem === "naturalEnvironmentSlope"
+        : activeDetailItem === "naturalEnvironmentElevation" ||
+            activeDetailItem === "naturalEnvironmentEcologyNatureMap" ||
+            activeDetailItem === "naturalEnvironmentSlope"
           ? "자연환경분석"
         : activeDetailItem === "planningSpecialPurposeArea"
           ? "도시계획분석"
@@ -665,6 +699,12 @@ export function SiteAnalysisDetailPanel() {
               noticeLines={naturalEnvironmentSlopeNoticeLines}
               status={naturalEnvironmentSlopeStatus}
               title="경사분석"
+            />
+          ) : activeDetailItem === "naturalEnvironmentEcologyNatureMap" ? (
+            <EcologyNatureMapContent
+              data={naturalEnvironmentEcologyNatureMapData}
+              error={naturalEnvironmentEcologyNatureMapError}
+              status={naturalEnvironmentEcologyNatureMapStatus}
             />
           ) : activeDetailItem === "planningSpecialPurposeArea" ? (
             <PlanningSpecialPurposeAreaContent
@@ -1098,6 +1138,155 @@ function BuildingInfoLayerItemRow({ item }: { item: BuildingInfoLayerItem }) {
       </span>
       <span className="shrink-0 text-slate-500">{countFormatter.format(item.count)}동</span>
     </li>
+  );
+}
+
+function EcologyNatureMapContent({
+  data,
+  error,
+  status
+}: {
+  data: NaturalEnvironmentEcologyNatureMapResponse | null;
+  error: string | null;
+  status: "idle" | "loading" | "success" | "error";
+}) {
+  const displayRows =
+    data?.table_rows.filter((row) => row.row_type === "zone" || row.row_type === "total" || row.row_type === "category") ??
+    [];
+  const errorRow = data?.table_rows.find((row) => row.row_type === "error") ?? null;
+
+  return (
+    <section className="min-h-0 flex-1 overflow-y-auto pt-5 font-[family-name:var(--font-pretendard)]">
+      <h3 className="text-sm font-semibold text-slate-800">생태자연도</h3>
+      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-light leading-5 text-amber-800">
+        {naturalEnvironmentEcologyNatureMapNoticeLines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
+
+      {status === "loading" ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
+          생태자연도를 불러오는 중입니다.
+        </p>
+      ) : null}
+
+      {status === "error" ? (
+        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-[12px] text-rose-700">
+          {error ?? "생태자연도를 불러오지 못했습니다."}
+        </p>
+      ) : null}
+
+      {status === "success" && data ? (
+        <div className="mt-4 flex flex-col gap-4">
+          <EcologyNatureMapStatusTable errorRow={errorRow} rows={displayRows} />
+          <EcologyNatureMapUsageTable />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function getEcologyNatureMapCellClass(row: BasicInfoAnalysisRow, className = "") {
+  const weightClass = row.row_type === "zone" || row.row_type === "total" ? "font-semibold" : "font-medium";
+  const colorClass = row.row_type === "category" ? "text-slate-700" : "text-slate-900";
+  const borderClass = row.row_type === "total" ? "border-b-2 border-slate-300" : "";
+
+  return `${className} ${weightClass} ${colorClass} ${borderClass}`.trim();
+}
+
+function EcologyNatureMapStatusTable({
+  errorRow,
+  rows
+}: {
+  errorRow: BasicInfoAnalysisRow | null;
+  rows: BasicInfoAnalysisRow[];
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-3 py-2">
+        <p className="text-sm font-semibold text-slate-800">생태 등급별 현황</p>
+        {errorRow ? <p className="mt-1 text-[11px] text-slate-500">면적오차: {formatArea(errorRow.area_m2)}</p> : null}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[520px] divide-y divide-slate-200 text-left text-[12px] font-[family-name:var(--font-pretendard)]">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="px-3 py-2 font-semibold">구분</th>
+              <th className="px-3 py-2 text-right font-semibold">면적(㎡)</th>
+              <th className="px-3 py-2 text-right font-semibold">구성비(%)</th>
+              <th className="px-3 py-2 font-semibold">비고</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
+            {rows.length > 0 ? (
+              rows.map((row) => (
+                <tr key={row.key}>
+                  <td className={getEcologyNatureMapCellClass(row, "whitespace-nowrap px-3 py-2")}>
+                    <span className="inline-flex items-center gap-2">
+                      {row.color ? (
+                        <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: row.color }} />
+                      ) : null}
+                      {row.label}
+                    </span>
+                  </td>
+                  <td className={getEcologyNatureMapCellClass(row, "whitespace-nowrap px-3 py-2 text-right")}>
+                    {formatArea(row.area_m2)}
+                  </td>
+                  <td className={getEcologyNatureMapCellClass(row, "whitespace-nowrap px-3 py-2 text-right")}>
+                    {formatRatio(row.ratio_percent)}
+                  </td>
+                  <td className={getEcologyNatureMapCellClass(row, "whitespace-nowrap px-3 py-2")}>
+                    {row.note ?? "-"}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="px-3 py-4 text-center text-[12px] text-slate-500">
+                  분석 결과에서 생태자연도를 찾을 수 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function EcologyNatureMapUsageTable() {
+  const rows = [
+    { label: "1등급", value: "자연환경의 보전 및 복원" },
+    { label: "2등급", value: "자연환경의 보전 및 개발 이용에 따른 훼손 최소화" },
+    { label: "3등급", value: "체계적인 개발 및 이용" },
+    {
+      label: "별도관리지역",
+      value: "역사적, 문화적, 경관적 가치가 있는 지역, 도시의 녹지보전 등을 위하여 관리되는 지역"
+    }
+  ];
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-3 py-2">
+        <p className="text-sm font-semibold text-slate-800">생태자연도 활용 기준</p>
+      </div>
+      <table className="w-full divide-y divide-slate-200 text-left text-[12px]">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            <th className="w-[112px] px-3 py-2 font-semibold">구분</th>
+            <th className="px-3 py-2 font-semibold">활용 기준</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800">{row.label}</td>
+              <td className="px-3 py-2 font-medium leading-5 text-slate-700">{row.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -55,8 +55,10 @@ const LOCATION_ANALYSIS_COLUMNS: LocationAnalysisColumn[] = [
       { label: "경사분석", detailItem: "naturalEnvironmentSlope" },
       ...[
         "향분석",
-        "단면분석",
-        "생태자연도",
+        "단면분석"
+      ].map((label) => ({ label })),
+      { label: "생태자연도", detailItem: "naturalEnvironmentEcologyNatureMap" },
+      ...[
         "식생(임상별)",
         "식생(영급별)",
         "식생(수종별)",

@@ -18,6 +18,8 @@ export type SiteAnalysisMapFeatureProperties = {
   terrain_shape_nm?: string | null;
   road_side_cd?: string | null;
   road_side_nm?: string | null;
+  eczm_gr?: string | number | null;
+  eczm_gr_name?: string | null;
   feature_type?: string;
   analysis_type?: string;
   building_uid?: string;
