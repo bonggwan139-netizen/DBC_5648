@@ -382,7 +382,12 @@ function ensureSiteAnalysisThematicMapLayers(map: MapLibreMap) {
         filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
         paint: {
           "fill-color": ["get", "color"],
-          "fill-opacity": 1
+          "fill-opacity": [
+            "case",
+            ["==", ["get", "analysis_type"], "natural_environment_ecology_nature_map"],
+            0.6,
+            1
+          ]
         }
       },
       map.getLayer(ZONE_CONFIRMED_LINE_LAYER_ID) ? ZONE_CONFIRMED_LINE_LAYER_ID : undefined
@@ -398,8 +403,18 @@ function ensureSiteAnalysisThematicMapLayers(map: MapLibreMap) {
         filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
         paint: {
           "line-color": "#1F2937",
-          "line-opacity": 1,
-          "line-width": 1
+          "line-opacity": [
+            "case",
+            ["==", ["get", "analysis_type"], "natural_environment_ecology_nature_map"],
+            0.55,
+            1
+          ],
+          "line-width": [
+            "case",
+            ["==", ["get", "analysis_type"], "natural_environment_ecology_nature_map"],
+            0.5,
+            1
+          ]
         }
       },
       map.getLayer(ZONE_CONFIRMED_LINE_LAYER_ID) ? ZONE_CONFIRMED_LINE_LAYER_ID : undefined
