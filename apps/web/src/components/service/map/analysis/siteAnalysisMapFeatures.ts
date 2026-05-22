@@ -4,11 +4,14 @@ export type SiteAnalysisMapFeatureProperties = {
   pnu?: string;
   key: string;
   label: string;
-  color: string;
+  color: string | null;
+  fill_opacity?: number | null;
   area_m2?: number;
   analysis_area_m2?: number;
+  display_area_m2?: number | null;
   included_area_m2?: number;
   inclusion_type?: string | null;
+  analysis_kind?: string;
   jimok_cd?: string | null;
   jimok_nm?: string | null;
   owner_type_cd?: string | null;
@@ -33,6 +36,7 @@ export type SiteAnalysisMapFeatureProperties = {
   gross_floor_area_m2?: number | null;
   building_coverage_ratio?: number | null;
   floor_area_ratio?: number | null;
+  is_non_forest?: boolean;
 };
 
 export type SiteAnalysisMapFeatureCollection = {
@@ -44,9 +48,51 @@ export type SiteAnalysisMapFeatureCollection = {
   }>;
 };
 
+export type SiteAnalysisMapFeature = SiteAnalysisMapFeatureCollection["features"][number];
+
 export function createEmptySiteAnalysisMapFeatureCollection(): SiteAnalysisMapFeatureCollection {
   return {
     type: "FeatureCollection",
     features: []
   };
+}
+
+function isFeatureCollection(value: unknown): value is SiteAnalysisMapFeatureCollection {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    (value as { type?: unknown }).type === "FeatureCollection" &&
+    Array.isArray((value as { features?: unknown }).features)
+  );
+}
+
+function isFeatureArray(value: unknown): value is SiteAnalysisMapFeature[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (feature) =>
+        feature !== null &&
+        typeof feature === "object" &&
+        (feature as { type?: unknown }).type === "Feature" &&
+        "geometry" in feature
+    )
+  );
+}
+
+export function normalizeSiteAnalysisMapFeatureCollection(value: unknown): SiteAnalysisMapFeatureCollection {
+  if (isFeatureCollection(value)) {
+    return {
+      type: "FeatureCollection",
+      features: value.features
+    };
+  }
+
+  if (isFeatureArray(value)) {
+    return {
+      type: "FeatureCollection",
+      features: value
+    };
+  }
+
+  return createEmptySiteAnalysisMapFeatureCollection();
 }

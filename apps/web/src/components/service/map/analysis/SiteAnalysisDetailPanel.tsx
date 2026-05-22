@@ -23,6 +23,13 @@ import {
   useSiteAnalysisNaturalEnvironmentEcologyNatureMap
 } from "./siteAnalysisNaturalEnvironmentEcologyNatureMap";
 import { useSiteAnalysisNaturalEnvironmentElevation } from "./siteAnalysisNaturalEnvironmentElevation";
+import {
+  type NaturalEnvironmentForestTypeMapResponse,
+  useSiteAnalysisNaturalEnvironmentForestAgeClass,
+  useSiteAnalysisNaturalEnvironmentForestDiameterClass,
+  useSiteAnalysisNaturalEnvironmentForestSpecies,
+  useSiteAnalysisNaturalEnvironmentForestType
+} from "./siteAnalysisNaturalEnvironmentForestTypeMap";
 import { useSiteAnalysisNaturalEnvironmentSlope } from "./siteAnalysisNaturalEnvironmentSlope";
 import {
   type BasicInfoAnalysisRow,
@@ -86,6 +93,10 @@ const naturalEnvironmentEcologyNatureMapNoticeLines = [
   "※ 면적은 구역계와 생태자연도 등급 polygon의 교차면적으로 산정됩니다.",
   "※ 생태자연도 미해당 지역은 등급별 합계에 포함되지 않을 수 있습니다."
 ];
+const naturalEnvironmentForestTypeMapNoticeLines = [
+  "※ 면적은 구역계와 산림입지/임상도 polygon의 교차면적으로 산정됩니다.",
+  "※ 산림이 아닌 토지는 색상 없이 표시될 수 있습니다."
+];
 const planningSpecialPurposeAreaNoticeLines = [
   "※ 계 = 용도지역별 분석면적의 합",
   "※ 면적오차 = 구역계 면적 - 계"
@@ -130,6 +141,10 @@ function getLandCategoryCellClass(row: BasicInfoAnalysisRow, className = "") {
         : "";
 
   return `${className} ${weightClass} ${colorClass} ${borderClass}`.trim();
+}
+
+function shouldShowZoneAndCategoryAreaRow(row: BasicInfoAnalysisRow) {
+  return row.row_type !== "error" && row.row_type !== "total" && row.label !== "면적오차" && row.label !== "계";
 }
 
 export function SiteAnalysisDetailPanel() {
@@ -245,6 +260,34 @@ export function SiteAnalysisDetailPanel() {
     loadNaturalEnvironmentEcologyNatureMap,
     status: naturalEnvironmentEcologyNatureMapStatus
   } = useSiteAnalysisNaturalEnvironmentEcologyNatureMap();
+  const {
+    canRequest: canRequestNaturalEnvironmentForestType,
+    data: naturalEnvironmentForestTypeData,
+    error: naturalEnvironmentForestTypeError,
+    loadForestTypeMapAnalysis: loadNaturalEnvironmentForestType,
+    status: naturalEnvironmentForestTypeStatus
+  } = useSiteAnalysisNaturalEnvironmentForestType();
+  const {
+    canRequest: canRequestNaturalEnvironmentForestAgeClass,
+    data: naturalEnvironmentForestAgeClassData,
+    error: naturalEnvironmentForestAgeClassError,
+    loadForestTypeMapAnalysis: loadNaturalEnvironmentForestAgeClass,
+    status: naturalEnvironmentForestAgeClassStatus
+  } = useSiteAnalysisNaturalEnvironmentForestAgeClass();
+  const {
+    canRequest: canRequestNaturalEnvironmentForestSpecies,
+    data: naturalEnvironmentForestSpeciesData,
+    error: naturalEnvironmentForestSpeciesError,
+    loadForestTypeMapAnalysis: loadNaturalEnvironmentForestSpecies,
+    status: naturalEnvironmentForestSpeciesStatus
+  } = useSiteAnalysisNaturalEnvironmentForestSpecies();
+  const {
+    canRequest: canRequestNaturalEnvironmentForestDiameterClass,
+    data: naturalEnvironmentForestDiameterClassData,
+    error: naturalEnvironmentForestDiameterClassError,
+    loadForestTypeMapAnalysis: loadNaturalEnvironmentForestDiameterClass,
+    status: naturalEnvironmentForestDiameterClassStatus
+  } = useSiteAnalysisNaturalEnvironmentForestDiameterClass();
   const {
     canRequest: canRequestNaturalEnvironmentSlope,
     data: naturalEnvironmentSlopeData,
@@ -425,6 +468,66 @@ export function SiteAnalysisDetailPanel() {
 
   useEffect(() => {
     if (
+      canRequestNaturalEnvironmentForestType &&
+      activeDetailItem === "naturalEnvironmentForestType" &&
+      naturalEnvironmentForestTypeStatus === "idle"
+    ) {
+      void loadNaturalEnvironmentForestType();
+    }
+  }, [
+    activeDetailItem,
+    canRequestNaturalEnvironmentForestType,
+    loadNaturalEnvironmentForestType,
+    naturalEnvironmentForestTypeStatus
+  ]);
+
+  useEffect(() => {
+    if (
+      canRequestNaturalEnvironmentForestAgeClass &&
+      activeDetailItem === "naturalEnvironmentForestAgeClass" &&
+      naturalEnvironmentForestAgeClassStatus === "idle"
+    ) {
+      void loadNaturalEnvironmentForestAgeClass();
+    }
+  }, [
+    activeDetailItem,
+    canRequestNaturalEnvironmentForestAgeClass,
+    loadNaturalEnvironmentForestAgeClass,
+    naturalEnvironmentForestAgeClassStatus
+  ]);
+
+  useEffect(() => {
+    if (
+      canRequestNaturalEnvironmentForestSpecies &&
+      activeDetailItem === "naturalEnvironmentForestSpecies" &&
+      naturalEnvironmentForestSpeciesStatus === "idle"
+    ) {
+      void loadNaturalEnvironmentForestSpecies();
+    }
+  }, [
+    activeDetailItem,
+    canRequestNaturalEnvironmentForestSpecies,
+    loadNaturalEnvironmentForestSpecies,
+    naturalEnvironmentForestSpeciesStatus
+  ]);
+
+  useEffect(() => {
+    if (
+      canRequestNaturalEnvironmentForestDiameterClass &&
+      activeDetailItem === "naturalEnvironmentForestDiameterClass" &&
+      naturalEnvironmentForestDiameterClassStatus === "idle"
+    ) {
+      void loadNaturalEnvironmentForestDiameterClass();
+    }
+  }, [
+    activeDetailItem,
+    canRequestNaturalEnvironmentForestDiameterClass,
+    loadNaturalEnvironmentForestDiameterClass,
+    naturalEnvironmentForestDiameterClassStatus
+  ]);
+
+  useEffect(() => {
+    if (
       canRequestPlanningSpecialPurposeArea &&
       activeDetailItem === "planningSpecialPurposeArea" &&
       planningSpecialPurposeAreaStatus === "idle"
@@ -467,7 +570,15 @@ export function SiteAnalysisDetailPanel() {
                               ? buildingFloorAreaRatioData?.map_features ?? null
                               : activeDetailItem === "naturalEnvironmentEcologyNatureMap"
                                 ? naturalEnvironmentEcologyNatureMapData?.map_features ?? null
-                                : null;
+                                : activeDetailItem === "naturalEnvironmentForestType"
+                                  ? naturalEnvironmentForestTypeData?.map_features ?? null
+                                  : activeDetailItem === "naturalEnvironmentForestAgeClass"
+                                    ? naturalEnvironmentForestAgeClassData?.map_features ?? null
+                                    : activeDetailItem === "naturalEnvironmentForestSpecies"
+                                      ? naturalEnvironmentForestSpeciesData?.map_features ?? null
+                                      : activeDetailItem === "naturalEnvironmentForestDiameterClass"
+                                        ? naturalEnvironmentForestDiameterClassData?.map_features ?? null
+                                        : null;
 
   useEffect(() => {
     if (!canOpen || !activeDetailItem) {
@@ -538,6 +649,10 @@ export function SiteAnalysisDetailPanel() {
         ? "건축물정보"
         : activeDetailItem === "naturalEnvironmentElevation" ||
             activeDetailItem === "naturalEnvironmentEcologyNatureMap" ||
+            activeDetailItem === "naturalEnvironmentForestAgeClass" ||
+            activeDetailItem === "naturalEnvironmentForestDiameterClass" ||
+            activeDetailItem === "naturalEnvironmentForestSpecies" ||
+            activeDetailItem === "naturalEnvironmentForestType" ||
             activeDetailItem === "naturalEnvironmentSlope"
           ? "자연환경분석"
         : activeDetailItem === "planningSpecialPurposeArea"
@@ -688,6 +803,7 @@ export function SiteAnalysisDetailPanel() {
               loadingMessage="표고분석을 불러오는 중입니다."
               noticeLines={naturalEnvironmentElevationNoticeLines}
               status={naturalEnvironmentElevationStatus}
+              tableRowsFilter={shouldShowZoneAndCategoryAreaRow}
               title="표고분석"
             />
           ) : activeDetailItem === "naturalEnvironmentSlope" ? (
@@ -698,6 +814,7 @@ export function SiteAnalysisDetailPanel() {
               loadingMessage="경사분석을 불러오는 중입니다."
               noticeLines={naturalEnvironmentSlopeNoticeLines}
               status={naturalEnvironmentSlopeStatus}
+              tableRowsFilter={shouldShowZoneAndCategoryAreaRow}
               title="경사분석"
             />
           ) : activeDetailItem === "naturalEnvironmentEcologyNatureMap" ? (
@@ -705,6 +822,42 @@ export function SiteAnalysisDetailPanel() {
               data={naturalEnvironmentEcologyNatureMapData}
               error={naturalEnvironmentEcologyNatureMapError}
               status={naturalEnvironmentEcologyNatureMapStatus}
+            />
+          ) : activeDetailItem === "naturalEnvironmentForestType" ? (
+            <ForestTypeMapContent
+              data={naturalEnvironmentForestTypeData}
+              emptyMessage="분석 결과에서 식생(임상별)을 찾을 수 없습니다."
+              error={naturalEnvironmentForestTypeError}
+              loadingMessage="식생(임상별)을 불러오는 중입니다."
+              status={naturalEnvironmentForestTypeStatus}
+              title="식생(임상별)"
+            />
+          ) : activeDetailItem === "naturalEnvironmentForestAgeClass" ? (
+            <ForestTypeMapContent
+              data={naturalEnvironmentForestAgeClassData}
+              emptyMessage="분석 결과에서 식생(영급별)을 찾을 수 없습니다."
+              error={naturalEnvironmentForestAgeClassError}
+              loadingMessage="식생(영급별)을 불러오는 중입니다."
+              status={naturalEnvironmentForestAgeClassStatus}
+              title="식생(영급별)"
+            />
+          ) : activeDetailItem === "naturalEnvironmentForestSpecies" ? (
+            <ForestTypeMapContent
+              data={naturalEnvironmentForestSpeciesData}
+              emptyMessage="분석 결과에서 식생(수종별)을 찾을 수 없습니다."
+              error={naturalEnvironmentForestSpeciesError}
+              loadingMessage="식생(수종별)을 불러오는 중입니다."
+              status={naturalEnvironmentForestSpeciesStatus}
+              title="식생(수종별)"
+            />
+          ) : activeDetailItem === "naturalEnvironmentForestDiameterClass" ? (
+            <ForestTypeMapContent
+              data={naturalEnvironmentForestDiameterClassData}
+              emptyMessage="분석 결과에서 식생(경급별)을 찾을 수 없습니다."
+              error={naturalEnvironmentForestDiameterClassError}
+              loadingMessage="식생(경급별)을 불러오는 중입니다."
+              status={naturalEnvironmentForestDiameterClassStatus}
+              title="식생(경급별)"
             />
           ) : activeDetailItem === "planningSpecialPurposeArea" ? (
             <PlanningSpecialPurposeAreaContent
@@ -1150,9 +1303,7 @@ function EcologyNatureMapContent({
   error: string | null;
   status: "idle" | "loading" | "success" | "error";
 }) {
-  const displayRows =
-    data?.table_rows.filter((row) => row.row_type === "zone" || row.row_type === "total" || row.row_type === "category") ??
-    [];
+  const displayRows = data?.table_rows.filter(shouldShowZoneAndCategoryAreaRow) ?? [];
   const errorRow = data?.table_rows.find((row) => row.row_type === "error") ?? null;
 
   return (
@@ -1178,6 +1329,11 @@ function EcologyNatureMapContent({
 
       {status === "success" && data ? (
         <div className="mt-4 flex flex-col gap-4">
+          <LandCategoryPieChart
+            emptyMessage="분석 결과에서 생태자연도를 찾을 수 없습니다."
+            rows={data.chart_rows.filter((row) => row.row_type === "category")}
+            useFallbackColors={false}
+          />
           <EcologyNatureMapStatusTable errorRow={errorRow} rows={displayRows} />
           <EcologyNatureMapUsageTable />
         </div>
@@ -1287,6 +1443,69 @@ function EcologyNatureMapUsageTable() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function ForestTypeMapContent({
+  data,
+  emptyMessage,
+  error,
+  loadingMessage,
+  status,
+  title
+}: {
+  data: NaturalEnvironmentForestTypeMapResponse | null;
+  emptyMessage: string;
+  error: string | null;
+  loadingMessage: string;
+  status: "idle" | "loading" | "success" | "error";
+  title: string;
+}) {
+  return (
+    <section className="min-h-0 flex-1 overflow-y-auto pt-5 font-[family-name:var(--font-pretendard)]">
+      <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-light leading-5 text-amber-800">
+        {naturalEnvironmentForestTypeMapNoticeLines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
+
+      {status === "loading" ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
+          {loadingMessage}
+        </p>
+      ) : null}
+
+      {status === "error" ? (
+        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-[12px] text-rose-700">
+          {error ?? loadingMessage.replace("불러오는 중입니다.", "불러오지 못했습니다.")}
+        </p>
+      ) : null}
+
+      {status === "success" && data && data.table_rows.length > 0 ? (
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-2">
+            <PlanningSummaryCard label="구역계 면적" value={formatOptionalArea(data.summary.zone_area_m2)} />
+            <PlanningSummaryCard label="분석면적" value={formatOptionalArea(data.summary.category_total_area_m2)} />
+            <PlanningSummaryCard label="면적오차" value={formatOptionalArea(data.summary.summary_area_error_m2)} />
+            <PlanningSummaryCard label="분류 수" value={formatNullableNumber(data.summary.category_count)} />
+            <PlanningSummaryCard label="도형 수" value={formatNullableNumber(data.summary.feature_count)} />
+          </div>
+          <LandCategoryPieChart
+            emptyMessage={emptyMessage}
+            rows={data.chart_rows.filter((row) => row.row_type === "category")}
+            useFallbackColors={false}
+          />
+          <LandCategoryTable rows={data.table_rows} />
+        </div>
+      ) : null}
+
+      {status === "success" && (!data || data.table_rows.length === 0) ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
+          {emptyMessage}
+        </p>
+      ) : null}
+    </section>
   );
 }
 
@@ -1491,6 +1710,7 @@ function CategoryAnalysisContent({
   loadingMessage,
   noticeLines,
   status,
+  tableRowsFilter,
   title
 }: {
   data: { table_rows: BasicInfoAnalysisRow[]; chart_rows: BasicInfoAnalysisRow[] } | null;
@@ -1499,8 +1719,11 @@ function CategoryAnalysisContent({
   loadingMessage: string;
   noticeLines: string[];
   status: "idle" | "loading" | "success" | "error";
+  tableRowsFilter?: (row: BasicInfoAnalysisRow) => boolean;
   title: string;
 }) {
+  const tableRows = data ? (tableRowsFilter ? data.table_rows.filter(tableRowsFilter) : data.table_rows) : [];
+
   return (
     <section className="min-h-0 flex-1 overflow-y-auto pt-5 font-[family-name:var(--font-pretendard)]">
       <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
@@ -1522,17 +1745,17 @@ function CategoryAnalysisContent({
         </p>
       ) : null}
 
-      {status === "success" && data && data.table_rows.length > 0 ? (
+      {status === "success" && data && tableRows.length > 0 ? (
         <div className="mt-4 flex flex-col gap-4">
           <LandCategoryPieChart
             emptyMessage={emptyMessage}
             rows={data.chart_rows.filter((row) => row.row_type === "category")}
           />
-          <LandCategoryTable rows={data.table_rows} />
+          <LandCategoryTable rows={tableRows} />
         </div>
       ) : null}
 
-      {status === "success" && (!data || data.table_rows.length === 0) ? (
+      {status === "success" && (!data || tableRows.length === 0) ? (
         <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-[12px] text-slate-500">
           {emptyMessage}
         </p>
@@ -1543,10 +1766,12 @@ function CategoryAnalysisContent({
 
 function LandCategoryPieChart({
   emptyMessage,
-  rows
+  rows,
+  useFallbackColors = true
 }: {
   emptyMessage: string;
   rows: BasicInfoAnalysisRow[];
+  useFallbackColors?: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -1565,6 +1790,7 @@ function LandCategoryPieChart({
         <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" role="img" aria-label="구성비 차트">
           <circle cx="60" cy="60" r="42" fill="#f8fafc" />
           {rows.map((row, index) => {
+            const color = useFallbackColors ? getRowColor(row, index) : row.color;
             const ratio =
               row.ratio_percent !== null
                 ? Math.max(row.ratio_percent, 0)
@@ -1581,7 +1807,7 @@ function LandCategoryPieChart({
                 cy="60"
                 r="42"
                 fill="none"
-                stroke={getRowColor(row, index)}
+                stroke={color ?? "transparent"}
                 strokeDasharray={`${ratio} ${Math.max(100 - ratio, 0)}`}
                 strokeDashoffset={-dashOffset}
                 strokeWidth="24"
@@ -1596,10 +1822,14 @@ function LandCategoryPieChart({
         <div className="min-w-0 flex-1 space-y-2">
           {rows.map((row, index) => (
             <div key={row.key} className="flex items-start gap-2 text-[12px] text-slate-600">
-              <span
-                className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: getRowColor(row, index) }}
-              />
+              {useFallbackColors || row.color ? (
+                <span
+                  className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: useFallbackColors ? getRowColor(row, index) : row.color ?? "transparent" }}
+                />
+              ) : (
+                <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full border border-slate-300 bg-transparent" />
+              )}
               <div className="min-w-0">
                 <p className="font-medium text-slate-800">{row.label}</p>
                 <p className="text-[11px] text-slate-500">

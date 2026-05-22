@@ -23,6 +23,10 @@ export type SiteAnalysisDetailItem =
   | "buildingFloorAreaRatio"
   | "naturalEnvironmentElevation"
   | "naturalEnvironmentEcologyNatureMap"
+  | "naturalEnvironmentForestAgeClass"
+  | "naturalEnvironmentForestDiameterClass"
+  | "naturalEnvironmentForestSpecies"
+  | "naturalEnvironmentForestType"
   | "naturalEnvironmentSlope"
   | "planningSpecialPurposeArea";
 export type PlanningMapLayer = "specialPurposeArea";

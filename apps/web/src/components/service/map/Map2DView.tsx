@@ -33,7 +33,10 @@ import {
   PLANNING_SPECIAL_PURPOSE_AREA_PATTERNS,
   type PlanningSpecialPurposeAreaPattern
 } from "./analysis/planningSpecialPurposeAreaStyle";
-import { createEmptySiteAnalysisMapFeatureCollection } from "./analysis/siteAnalysisMapFeatures";
+import {
+  createEmptySiteAnalysisMapFeatureCollection,
+  normalizeSiteAnalysisMapFeatureCollection
+} from "./analysis/siteAnalysisMapFeatures";
 import { useSiteAnalysis, type NaturalEnvironmentMapOverlay } from "./analysis/siteAnalysisState";
 import { createEmptyFeatureCollection } from "./zone-selection/zoneSelectionGeometry";
 import { ZoneSelectionSearchPanel } from "./zone-selection/ZoneSelectionSearchPanel";
@@ -381,11 +384,13 @@ function ensureSiteAnalysisThematicMapLayers(map: MapLibreMap) {
         source: SITE_ANALYSIS_THEMATIC_SOURCE_ID,
         filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
         paint: {
-          "fill-color": ["get", "color"],
+          "fill-color": ["coalesce", ["get", "color"], "rgba(0, 0, 0, 0)"],
           "fill-opacity": [
             "case",
             ["==", ["get", "analysis_type"], "natural_environment_ecology_nature_map"],
             0.6,
+            ["has", "fill_opacity"],
+            ["coalesce", ["get", "fill_opacity"], 0],
             1
           ]
         }
@@ -402,9 +407,26 @@ function ensureSiteAnalysisThematicMapLayers(map: MapLibreMap) {
         source: SITE_ANALYSIS_THEMATIC_SOURCE_ID,
         filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
         paint: {
-          "line-color": "#1F2937",
+          "line-color": [
+            "case",
+            ["==", ["get", "feature_type"], "forest_type_map"],
+            ["coalesce", ["get", "color"], "rgba(0, 0, 0, 0)"],
+            "#1F2937"
+          ],
           "line-opacity": [
             "case",
+            ["==", ["get", "feature_type"], "forest_type_map"],
+            [
+              "case",
+              [
+                "any",
+                ["!", ["has", "color"]],
+                ["==", ["get", "color"], null],
+                ["==", ["coalesce", ["get", "fill_opacity"], 0.6], 0]
+              ],
+              0,
+              1
+            ],
             ["==", ["get", "analysis_type"], "natural_environment_ecology_nature_map"],
             0.55,
             1
@@ -1470,7 +1492,11 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     }
 
     ensureSiteAnalysisThematicMapLayers(map);
-    setGeoJsonSourceData(map, SITE_ANALYSIS_THEMATIC_SOURCE_ID, activeThematicMapFeatures);
+    setGeoJsonSourceData(
+      map,
+      SITE_ANALYSIS_THEMATIC_SOURCE_ID,
+      normalizeSiteAnalysisMapFeatureCollection(activeThematicMapFeatures)
+    );
 
     return () => {
       removeSiteAnalysisThematicMapLayers(map);

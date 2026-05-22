@@ -58,11 +58,11 @@ const LOCATION_ANALYSIS_COLUMNS: LocationAnalysisColumn[] = [
         "단면분석"
       ].map((label) => ({ label })),
       { label: "생태자연도", detailItem: "naturalEnvironmentEcologyNatureMap" },
+      { label: "식생(임상별)", detailItem: "naturalEnvironmentForestType" },
+      { label: "식생(영급별)", detailItem: "naturalEnvironmentForestAgeClass" },
+      { label: "식생(수종별)", detailItem: "naturalEnvironmentForestSpecies" },
+      { label: "식생(경급별)", detailItem: "naturalEnvironmentForestDiameterClass" },
       ...[
-        "식생(임상별)",
-        "식생(영급별)",
-        "식생(수종별)",
-        "식생(경급별)",
         "국토환경",
         "산사태위험지도",
         "수리/수문",

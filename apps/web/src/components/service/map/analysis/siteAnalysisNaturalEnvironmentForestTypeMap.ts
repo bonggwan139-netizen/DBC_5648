@@ -8,7 +8,13 @@ import {
   type SiteAnalysisMapFeatureCollection
 } from "./siteAnalysisMapFeatures";
 
-export type NaturalEnvironmentEcologyNatureMapResponse = {
+type ForestTypeMapEndpoint =
+  | "/analysis/location-analysis/natural-environment/forest-type-map/forest-type"
+  | "/analysis/location-analysis/natural-environment/forest-type-map/age-class"
+  | "/analysis/location-analysis/natural-environment/forest-type-map/species"
+  | "/analysis/location-analysis/natural-environment/forest-type-map/diameter-class";
+
+export type NaturalEnvironmentForestTypeMapResponse = {
   summary: {
     zone_area_m2?: number;
     category_count?: number;
@@ -21,32 +27,32 @@ export type NaturalEnvironmentEcologyNatureMapResponse = {
   map_features: SiteAnalysisMapFeatureCollection;
 };
 
-type NaturalEnvironmentEcologyNatureMapApiResponse = Omit<NaturalEnvironmentEcologyNatureMapResponse, "map_features"> & {
+type NaturalEnvironmentForestTypeMapApiResponse = Omit<NaturalEnvironmentForestTypeMapResponse, "map_features"> & {
   map_features?: unknown;
 };
 
-type NaturalEnvironmentEcologyNatureMapStatus = "idle" | "loading" | "success" | "error";
+type NaturalEnvironmentForestTypeMapStatus = "idle" | "loading" | "success" | "error";
 
-type NaturalEnvironmentEcologyNatureMapState = {
-  status: NaturalEnvironmentEcologyNatureMapStatus;
-  data: NaturalEnvironmentEcologyNatureMapResponse | null;
+type NaturalEnvironmentForestTypeMapState = {
+  status: NaturalEnvironmentForestTypeMapStatus;
+  data: NaturalEnvironmentForestTypeMapResponse | null;
   error: string | null;
 };
 
-const initialState: NaturalEnvironmentEcologyNatureMapState = {
+const initialState: NaturalEnvironmentForestTypeMapState = {
   status: "idle",
   data: null,
   error: null
 };
 
-export function useSiteAnalysisNaturalEnvironmentEcologyNatureMap() {
+function useNaturalEnvironmentForestTypeMapAnalysis(endpoint: ForestTypeMapEndpoint, label: string) {
   const { state: zoneState } = useZoneSelection();
-  const [state, setState] = useState<NaturalEnvironmentEcologyNatureMapState>(initialState);
+  const [state, setState] = useState<NaturalEnvironmentForestTypeMapState>(initialState);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const canRequest = zoneState.status === "confirmed" && zoneState.confirmedZone !== null;
 
-  const loadNaturalEnvironmentEcologyNatureMap = useCallback(async () => {
+  const loadForestTypeMapAnalysis = useCallback(async () => {
     if (zoneState.status !== "confirmed" || !zoneState.confirmedZone) {
       setState({
         status: "error",
@@ -67,7 +73,7 @@ export function useSiteAnalysisNaturalEnvironmentEcologyNatureMap() {
     });
 
     try {
-      const response = await fetch("/analysis/location-analysis/natural-environment/ecology-nature-map", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -80,10 +86,10 @@ export function useSiteAnalysisNaturalEnvironmentEcologyNatureMap() {
 
       if (!response.ok) {
         const message = await response.text();
-        throw new Error(message || `생태자연도 요청에 실패했습니다. (${response.status})`);
+        throw new Error(message || `${label} 요청에 실패했습니다. (${response.status})`);
       }
 
-      const data = (await response.json()) as NaturalEnvironmentEcologyNatureMapApiResponse;
+      const data = (await response.json()) as NaturalEnvironmentForestTypeMapApiResponse;
 
       setState({
         status: "success",
@@ -101,14 +107,14 @@ export function useSiteAnalysisNaturalEnvironmentEcologyNatureMap() {
       setState({
         status: "error",
         data: null,
-        error: error instanceof Error ? error.message : "생태자연도 요청 중 오류가 발생했습니다."
+        error: error instanceof Error ? error.message : `${label} 요청 중 오류가 발생했습니다.`
       });
     } finally {
       if (abortControllerRef.current === abortController) {
         abortControllerRef.current = null;
       }
     }
-  }, [zoneState.confirmedZone, zoneState.status]);
+  }, [endpoint, label, zoneState.confirmedZone, zoneState.status]);
 
   useEffect(() => {
     if (canRequest) {
@@ -129,6 +135,34 @@ export function useSiteAnalysisNaturalEnvironmentEcologyNatureMap() {
   return {
     ...state,
     canRequest,
-    loadNaturalEnvironmentEcologyNatureMap
+    loadForestTypeMapAnalysis
   };
+}
+
+export function useSiteAnalysisNaturalEnvironmentForestType() {
+  return useNaturalEnvironmentForestTypeMapAnalysis(
+    "/analysis/location-analysis/natural-environment/forest-type-map/forest-type",
+    "식생(임상별)"
+  );
+}
+
+export function useSiteAnalysisNaturalEnvironmentForestAgeClass() {
+  return useNaturalEnvironmentForestTypeMapAnalysis(
+    "/analysis/location-analysis/natural-environment/forest-type-map/age-class",
+    "식생(영급별)"
+  );
+}
+
+export function useSiteAnalysisNaturalEnvironmentForestSpecies() {
+  return useNaturalEnvironmentForestTypeMapAnalysis(
+    "/analysis/location-analysis/natural-environment/forest-type-map/species",
+    "식생(수종별)"
+  );
+}
+
+export function useSiteAnalysisNaturalEnvironmentForestDiameterClass() {
+  return useNaturalEnvironmentForestTypeMapAnalysis(
+    "/analysis/location-analysis/natural-environment/forest-type-map/diameter-class",
+    "식생(경급별)"
+  );
 }
