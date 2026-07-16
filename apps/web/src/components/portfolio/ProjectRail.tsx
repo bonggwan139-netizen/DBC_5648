@@ -12,7 +12,7 @@ export function ProjectRail({ items }: ProjectRailProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   return (
-    <div className="flex min-h-[460px] w-[980px] items-center gap-6 overflow-visible">
+    <div className="flex min-h-[460px] w-full items-center justify-center gap-6 overflow-visible">
       {items.map((project, index) => {
         const isHovered = hoveredIndex === index;
 

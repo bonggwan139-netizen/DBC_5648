@@ -14,16 +14,12 @@ type BasicInfoColumn = {
 
 type LocationAnalysisColumn = {
   title: string;
-  items: BasicInfoItem[];
+  items: Array<{ label: string; detailItem: SiteAnalysisDetailItem }>;
 };
 
 const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
   {
-    title: "위치정보",
-    items: [{ label: "위치정보", detailItem: "basicLocationInfo" }]
-  },
-  {
-    title: "토지정보",
+    title: "토지 현황",
     items: [
       { label: "지목현황", detailItem: "basicLandCategory" },
       { label: "소유현황", detailItem: "basicOwnership" },
@@ -34,7 +30,7 @@ const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
     ]
   },
   {
-    title: "건축물정보",
+    title: "건축물 현황",
     items: [
       { label: "용도현황", detailItem: "buildingUse" },
       { label: "구조현황", detailItem: "buildingStructure" },
@@ -47,52 +43,31 @@ const BASIC_INFO_COLUMNS: BasicInfoColumn[] = [
   }
 ];
 
+function getAnalysisButtonClass(isActive: boolean) {
+  return `flex min-h-9 w-full items-center rounded-md border px-3 py-1.5 text-left text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-[#102156]/30 ${
+    isActive
+      ? "border-[#102156] bg-[#102156] text-white"
+      : "border-slate-200 bg-white text-slate-700 hover:border-[#102156] hover:text-[#102156]"
+  }`;
+}
+
 const LOCATION_ANALYSIS_COLUMNS: LocationAnalysisColumn[] = [
   {
-    title: "자연환경분석",
+    title: "자연환경",
     items: [
-      { label: "표고분석", detailItem: "naturalEnvironmentElevation" },
-      { label: "경사분석", detailItem: "naturalEnvironmentSlope" },
-      ...[
-        "향분석",
-        "단면분석"
-      ].map((label) => ({ label })),
+      { label: "표고", detailItem: "naturalEnvironmentElevation" },
+      { label: "경사", detailItem: "naturalEnvironmentSlope" },
       { label: "생태자연도", detailItem: "naturalEnvironmentEcologyNatureMap" },
-      { label: "식생(임상별)", detailItem: "naturalEnvironmentForestType" },
-      { label: "식생(영급별)", detailItem: "naturalEnvironmentForestAgeClass" },
-      { label: "식생(수종별)", detailItem: "naturalEnvironmentForestSpecies" },
-      { label: "식생(경급별)", detailItem: "naturalEnvironmentForestDiameterClass" },
-      ...[
-        "국토환경",
-        "산사태위험지도",
-        "수리/수문",
-        "기상기후",
-        "백두대간/정맥"
-      ].map((label) => ({ label }))
+      { label: "임상별", detailItem: "naturalEnvironmentForestType" },
+      { label: "영급별", detailItem: "naturalEnvironmentForestAgeClass" },
+      { label: "수종별", detailItem: "naturalEnvironmentForestSpecies" },
+      { label: "경급별", detailItem: "naturalEnvironmentForestDiameterClass" }
     ]
   },
   {
-    title: "토지건물분석",
+    title: "도시계획",
     items: [
-      "토지이용",
-      "토지피복",
-      "지가현황/표준지",
-      "토지형상(정비사업)",
-      "노후도(정비사업)",
-      "호수밀도(정비사업)",
-      "접도율(정비사업)",
-      "지하층(정비사업)",
-      "역세권분석",
-      "주변건물현황"
-    ].map((label) => ({ label }))
-  },
-  {
-    title: "도시계획분석",
-    items: [
-      { label: "용도지역", detailItem: "planningSpecialPurposeArea" },
-      { label: "용도지구" },
-      { label: "용도구역" },
-      { label: "도시계획시설" }
+      { label: "용도지역", detailItem: "planningSpecialPurposeArea" }
     ]
   }
 ];
@@ -113,13 +88,13 @@ export function SiteAnalysisOverlay() {
 
   if (activeSection === "locationAnalysis") {
     return (
-      <section className="w-[min(860px,calc(100vw-430px))] rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
+      <section className="w-[min(620px,calc(100vw-470px))] rounded-lg border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
         <header className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
-          <h2 className="text-sm font-semibold text-slate-900">입지분석</h2>
+          <h2 className="text-sm font-semibold text-slate-900">환경·도시계획 분석</h2>
           <button
             type="button"
             onClick={closeSection}
-            aria-label="입지분석 패널 닫기"
+            aria-label="환경·도시계획 분석 패널 닫기"
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
           >
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -128,38 +103,28 @@ export function SiteAnalysisOverlay() {
           </button>
         </header>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           {LOCATION_ANALYSIS_COLUMNS.map((column) => (
-            <div key={column.title} className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+            <div key={column.title} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <h3 className="text-sm font-semibold text-slate-800">{column.title}</h3>
-              <ul className="mt-2 space-y-1.5 text-[12px] leading-5 text-slate-600">
+              <ul className="mt-3 grid gap-1.5 text-[12px] leading-5 text-slate-600">
                 {column.items.map((item) => {
                   const detailItem = item.detailItem;
 
                   return (
                     <li key={item.label}>
-                      {detailItem ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            openDetailItem(detailItem, "locationAnalysis");
-                            setActivePlanningMapLayer(
-                              detailItem === "planningSpecialPurposeArea" ? "specialPurposeArea" : null
-                            );
-                          }}
-                          className={`rounded-md px-1 py-0.5 text-left font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${
-                            activeDetailItem === detailItem
-                              ? "bg-slate-900 text-white"
-                              : "text-slate-700 hover:bg-white"
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ) : (
-                        <span className="inline-flex rounded-md px-1 py-0.5 font-medium text-slate-500">
-                          {item.label}
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          openDetailItem(detailItem, "locationAnalysis");
+                          setActivePlanningMapLayer(
+                            detailItem === "planningSpecialPurposeArea" ? "specialPurposeArea" : null
+                          );
+                        }}
+                        className={getAnalysisButtonClass(activeDetailItem === detailItem)}
+                      >
+                        <span>{item.label}</span>
+                      </button>
                     </li>
                   );
                 })}
@@ -172,13 +137,13 @@ export function SiteAnalysisOverlay() {
   }
 
   return (
-    <section className="w-[min(820px,calc(100vw-430px))] rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
+    <section className="w-[min(620px,calc(100vw-470px))] rounded-lg border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
       <header className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
-        <h2 className="text-sm font-semibold text-slate-900">기본정보</h2>
+        <h2 className="text-sm font-semibold text-slate-900">토지·건축 분석</h2>
         <button
           type="button"
           onClick={closeSection}
-          aria-label="기본정보 패널 닫기"
+          aria-label="토지·건축 분석 패널 닫기"
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -187,11 +152,11 @@ export function SiteAnalysisOverlay() {
         </button>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2">
         {BASIC_INFO_COLUMNS.map((column) => (
-          <div key={column.title} className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+          <div key={column.title} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <h3 className="text-sm font-semibold text-slate-800">{column.title}</h3>
-            <ul className="mt-2 space-y-1.5 text-[12px] leading-5 text-slate-600">
+            <ul className="mt-3 grid gap-1.5 text-[12px] leading-5 text-slate-600">
               {column.items.map((item) => {
                 const detailItem = item.detailItem;
 
@@ -201,11 +166,7 @@ export function SiteAnalysisOverlay() {
                       <button
                         type="button"
                         onClick={() => openDetailItem(detailItem)}
-                        className={`rounded-md px-1 py-0.5 text-left font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${
-                          activeDetailItem === detailItem
-                            ? "bg-slate-900 text-white"
-                            : "text-slate-700 hover:bg-white"
-                        }`}
+                        className={getAnalysisButtonClass(activeDetailItem === detailItem)}
                       >
                         {item.label}
                       </button>

@@ -22,20 +22,16 @@ export function Header() {
               active ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
             }`}
           >
-            Portfolio
+            서비스 소개
           </Link>
         </nav>
 
-        <button
-          type="button"
-          aria-label="Menu (coming soon)"
-          disabled
-          className="group flex h-8 w-8 cursor-not-allowed flex-col items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 opacity-80"
+        <Link
+          href="/portfolio/dbc-map"
+          className="rounded-full border border-[#102156] bg-[#102156] px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-[#1a316f] focus:outline-none focus:ring-2 focus:ring-[#102156]/30"
         >
-          <span className="h-[1.5px] w-4 bg-slate-500" />
-          <span className="h-[1.5px] w-4 bg-slate-500" />
-          <span className="h-[1.5px] w-4 bg-slate-500" />
-        </button>
+          DBC-MAP 열기
+        </Link>
       </div>
     </header>
   );

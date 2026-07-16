@@ -84,6 +84,7 @@ type MapClickEventLike = {
   originalEvent?: {
     button?: number;
     preventDefault?: () => void;
+    stopPropagation?: () => void;
   };
 };
 
@@ -755,7 +756,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     handleMapClick,
     addParcelByCoordinate,
     handleMapMouseMove,
-    handleMapContextMenu,
+    handleMapDoubleClick,
     latestImportedGeometryBounds,
     isDrawModeActive,
     isInteractionLocked
@@ -775,8 +776,12 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   const scheduleRefreshPlanningDataRef = useRef<() => void>(() => {});
   const handleMapClickEventRef = useRef<(event: unknown) => void>(() => {});
   const handleMapMouseMoveEventRef = useRef<(event: unknown) => void>(() => {});
-  const handleMapContextMenuEventRef = useRef<(event: unknown) => void>(() => {});
+  const handleMapDoubleClickEventRef = useRef<(event: unknown) => void>(() => {});
   const drawModeRef = useRef(false);
+  const hasRequestedInitialGeolocationRef = useRef(false);
+  const hasAppliedInitialGeolocationRef = useRef(false);
+  const hasUserInteractedBeforeGeolocationRef = useRef(false);
+  const isApplyingInitialGeolocationRef = useRef(false);
   const lastFittedImportIdRef = useRef<string | null>(null);
   const zoneSearchSelectionDeadlineRef = useRef<number | null>(null);
   const zoneSearchSelectionRetryTimerRef = useRef<number | null>(null);
@@ -1012,6 +1017,60 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     }, MAP_DATA_MOVEEND_DEBOUNCE_MS);
   };
 
+  const markUserInteractionBeforeGeolocation = () => {
+    if (isApplyingInitialGeolocationRef.current || hasAppliedInitialGeolocationRef.current) {
+      return;
+    }
+
+    hasUserInteractedBeforeGeolocationRef.current = true;
+  };
+
+  const requestInitialGeolocation = (map: MapLibreMap) => {
+    if (hasRequestedInitialGeolocationRef.current || typeof navigator === "undefined" || !navigator.geolocation) {
+      return;
+    }
+
+    hasRequestedInitialGeolocationRef.current = true;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (
+          hasAppliedInitialGeolocationRef.current ||
+          hasUserInteractedBeforeGeolocationRef.current ||
+          mapRef.current !== map
+        ) {
+          return;
+        }
+
+        const { latitude, longitude } = position.coords;
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          return;
+        }
+
+        hasAppliedInitialGeolocationRef.current = true;
+        isApplyingInitialGeolocationRef.current = true;
+        map.flyTo({
+          center: [longitude, latitude],
+          zoom: 15,
+          essential: true,
+          duration: 900
+        });
+
+        window.setTimeout(() => {
+          isApplyingInitialGeolocationRef.current = false;
+        }, 1100);
+      },
+      () => {
+        isApplyingInitialGeolocationRef.current = false;
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60000,
+        timeout: 7000
+      }
+    );
+  };
+
   const handleMapClickEvent = (event: unknown) => {
     const rawEvent = event as MapClickEventLike;
     const point = rawEvent.point;
@@ -1032,6 +1091,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       return;
     }
 
+    markUserInteractionBeforeGeolocation();
     handleMapClick({
       point: {
         x: point.x,
@@ -1072,7 +1132,11 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     });
   };
 
-  const handleMapContextMenuEvent = (event: unknown) => {
+  const handleMapDoubleClickEvent = (event: unknown) => {
+    if (!drawModeRef.current) {
+      return;
+    }
+
     const rawEvent = event as MapClickEventLike;
     const point = rawEvent.point;
     const lngLat = rawEvent.lngLat;
@@ -1088,7 +1152,10 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       return;
     }
 
-    handleMapContextMenu({
+    rawEvent.originalEvent?.preventDefault?.();
+    rawEvent.originalEvent?.stopPropagation?.();
+    markUserInteractionBeforeGeolocation();
+    handleMapDoubleClick({
       point: {
         x: point.x,
         y: point.y
@@ -1108,10 +1175,10 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
     scheduleRefreshPlanningDataRef.current = scheduleRefreshPlanningData;
     handleMapClickEventRef.current = handleMapClickEvent;
     handleMapMouseMoveEventRef.current = handleMapMouseMoveEvent;
-    handleMapContextMenuEventRef.current = handleMapContextMenuEvent;
+    handleMapDoubleClickEventRef.current = handleMapDoubleClickEvent;
   }, [
     handleMapClickEvent,
-    handleMapContextMenuEvent,
+    handleMapDoubleClickEvent,
     handleMapMouseMoveEvent,
     refreshCadastralData,
     refreshPlanningData
@@ -1120,6 +1187,12 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   useEffect(() => {
     drawModeRef.current = isDrawModeActive;
   }, [isDrawModeActive]);
+
+  useEffect(() => {
+    if (isInteractionLocked) {
+      markUserInteractionBeforeGeolocation();
+    }
+  }, [isInteractionLocked]);
 
   const selectedParcelAddressValue = selectedParcel ? pickParcelValue(selectedParcel, ["addr"]) : null;
   const selectedParcelAddress =
@@ -1189,12 +1262,19 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
         map.on("mousemove", (event: unknown) => {
           handleMapMouseMoveEventRef.current(event);
         });
-        map.on("contextmenu", (event: unknown) => {
-          handleMapContextMenuEventRef.current(event);
+        map.on("dblclick", (event: unknown) => {
+          handleMapDoubleClickEventRef.current(event);
+        });
+        map.on("dragstart", () => {
+          markUserInteractionBeforeGeolocation();
+        });
+        map.on("zoomstart", () => {
+          markUserInteractionBeforeGeolocation();
         });
 
         void refreshCadastralDataRef.current(true);
         setIsMapReady(true);
+        requestInitialGeolocation(map);
       });
 
       mapRef.current = map;
@@ -1226,27 +1306,6 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   }, []);
 
   useEffect(() => {
-    const container = mapContainerRef.current;
-    if (!container) {
-      return;
-    }
-
-    const preventContextMenu = (event: MouseEvent) => {
-      if (!drawModeRef.current) {
-        return;
-      }
-
-      event.preventDefault();
-    };
-
-    container.addEventListener("contextmenu", preventContextMenu);
-
-    return () => {
-      container.removeEventListener("contextmenu", preventContextMenu);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!mapRef.current || !isMapReady) {
       return;
     }
@@ -1260,11 +1319,27 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
   }, [isMapReady, styleType]);
 
   useEffect(() => {
+    if (!mapRef.current || !isMapReady || !mapRef.current.doubleClickZoom) {
+      return;
+    }
+
+    if (isDrawModeActive) {
+      mapRef.current.doubleClickZoom.disable();
+      return () => {
+        mapRef.current?.doubleClickZoom?.enable();
+      };
+    }
+
+    mapRef.current.doubleClickZoom.enable();
+  }, [isDrawModeActive, isMapReady]);
+
+  useEffect(() => {
     const pendingNavigation = mapSearchState.pendingNavigation;
     if (!isMapReady || !mapRef.current || !pendingNavigation) {
       return;
     }
 
+    markUserInteractionBeforeGeolocation();
     mapRef.current.flyTo({
       center: pendingNavigation.center,
       zoom: pendingNavigation.zoom,
@@ -1290,6 +1365,7 @@ export function Map2DView({ showStyleSelector }: Map2DViewProps) {
       }, 1000);
     }
 
+    markUserInteractionBeforeGeolocation();
     mapRef.current.flyTo({
       center: pendingNavigation.center,
       zoom: pendingNavigation.zoom,

@@ -32,9 +32,10 @@ type MapClickEvent = {
   };
 };
 
-type MapContextMenuEvent = MapClickEvent & {
+type MapDoubleClickEvent = MapClickEvent & {
   originalEvent?: {
     preventDefault?: () => void;
+    stopPropagation?: () => void;
   };
 };
 
@@ -437,12 +438,14 @@ export function useZoneSelectionMap(params: {
     setHoverCoordinate(resolvedCoordinate.coordinate);
   };
 
-  const handleMapContextMenu = (event: MapContextMenuEvent) => {
+  const handleMapDoubleClick = (event: MapDoubleClickEvent) => {
     if (!isEditingWithDrawTool) {
       return;
     }
 
     event.originalEvent?.preventDefault?.();
+    event.originalEvent?.stopPropagation?.();
+    setHoverCoordinate(null);
     completeDrawBoundary();
   };
 
@@ -460,7 +463,7 @@ export function useZoneSelectionMap(params: {
     handleMapClick,
     addParcelByCoordinate,
     handleMapMouseMove,
-    handleMapContextMenu,
+    handleMapDoubleClick,
     latestImportedGeometryBounds,
     isInteractionLocked,
     isDrawModeActive: isEditingWithDrawTool,

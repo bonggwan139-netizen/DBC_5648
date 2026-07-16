@@ -638,7 +638,7 @@ export function SiteAnalysisDetailPanel() {
 
   const panelTitle =
     activeDetailItem === "basicLocationInfo"
-      ? "위치정보"
+      ? "토지·건축 분석"
       : activeDetailItem === "buildingUse" ||
           activeDetailItem === "buildingStructure" ||
           activeDetailItem === "buildingFloor" ||
@@ -646,7 +646,7 @@ export function SiteAnalysisDetailPanel() {
           activeDetailItem === "buildingGrossFloorArea" ||
           activeDetailItem === "buildingCoverageRatio" ||
           activeDetailItem === "buildingFloorAreaRatio"
-        ? "건축물정보"
+        ? "토지·건축 분석"
         : activeDetailItem === "naturalEnvironmentElevation" ||
             activeDetailItem === "naturalEnvironmentEcologyNatureMap" ||
             activeDetailItem === "naturalEnvironmentForestAgeClass" ||
@@ -654,10 +654,10 @@ export function SiteAnalysisDetailPanel() {
             activeDetailItem === "naturalEnvironmentForestSpecies" ||
             activeDetailItem === "naturalEnvironmentForestType" ||
             activeDetailItem === "naturalEnvironmentSlope"
-          ? "자연환경분석"
+          ? "환경·도시계획 분석"
         : activeDetailItem === "planningSpecialPurposeArea"
-          ? "도시계획분석"
-          : "토지정보";
+          ? "환경·도시계획 분석"
+          : "토지·건축 분석";
 
   return (
     <motion.aside
@@ -685,7 +685,7 @@ export function SiteAnalysisDetailPanel() {
       {!collapsed ? (
         <div className="flex min-w-0 flex-1 flex-col p-5">
           <header className="border-b border-slate-200 pb-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Site Analysis</p>
+            <p className="text-[11px] font-semibold text-slate-400">현황 분석</p>
             <h2 className="mt-1 text-base font-semibold text-slate-900">{panelTitle}</h2>
           </header>
 
